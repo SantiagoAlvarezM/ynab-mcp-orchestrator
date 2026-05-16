@@ -1,0 +1,51 @@
+[project]
+name = "ynab-mcp-orchestrator"
+version = "0.1.0"
+description = "An intelligent MCP server that extracts financial data from bank statements and syncs with YNAB"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp[cli]>=1.8.0",
+    "pymupdf>=1.25.0",
+    "openpyxl>=3.1.0",
+    "msoffcrypto-tool>=5.4.0",
+    "httpx>=0.28.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.1.0",
+]
+
+[project.scripts]
+ynab-mcp = "server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.11.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]

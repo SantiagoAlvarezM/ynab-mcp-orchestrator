@@ -1,0 +1,132 @@
+"""YNAB REST API client.
+
+Wraps the YNAB v1 API using httpx for async HTTP.
+Reference: https://api.ynab.com/v1
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+
+from src.config import YNAB_BASE_URL, YNAB_PAT
+
+
+class YNABClient:
+    """Async client for the YNAB REST API."""
+
+    def __init__(
+        self,
+        base_url: str = YNAB_BASE_URL,
+        pat: str = YNAB_PAT,
+    ):
+        self._base_url = base_url.rstrip("/")
+        self._pat = pat
+
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self._pat}",
+            "Content-Type": "application/json",
+        }
+
+    def _ensure_configured(self) -> None:
+        if not self._pat:
+            raise ValueError(
+                "YNAB Personal Access Token not configured. Set YNAB_PAT in your .env file."
+            )
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        json_body: dict | None = None,
+    ) -> dict[str, Any]:
+        """Make an authenticated request to the YNAB API."""
+        self._ensure_configured()
+
+        url = f"{self._base_url}{path}"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.request(
+                method=method,
+                url=url,
+                headers=self._headers(),
+                json=json_body,
+                timeout=30.0,
+            )
+
+            if response.status_code >= 400:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get("error", {}).get("detail", response.text)
+                except Exception:
+                    pass
+
+                raise httpx.HTTPStatusError(
+                    f"YNAB API error ({response.status_code}): {error_detail}",
+                    request=response.request,
+                    response=response,
+                )
+
+            return response.json()
+
+    # ── Budgets ─────────────────────────────────────────────────────────────
+
+    async def list_budgets(self) -> list[dict]:
+        """List all budgets."""
+        data = await self._request("GET", "/budgets")
+        return data.get("data", {}).get("budgets", [])
+
+    async def get_budget(self, budget_id: str) -> dict:
+        """Get a specific budget."""
+        data = await self._request("GET", f"/budgets/{budget_id}")
+        return data.get("data", {}).get("budget", {})
+
+    # ── Accounts ────────────────────────────────────────────────────────────
+
+    async def list_accounts(self, budget_id: str) -> list[dict]:
+        """List all accounts in a budget."""
+        data = await self._request("GET", f"/budgets/{budget_id}/accounts")
+        return data.get("data", {}).get("accounts", [])
+
+    # ── Categories ──────────────────────────────────────────────────────────
+
+    async def list_categories(self, budget_id: str) -> list[dict]:
+        """List all category groups and their categories in a budget."""
+        data = await self._request("GET", f"/budgets/{budget_id}/categories")
+        return data.get("data", {}).get("category_groups", [])
+
+    # ── Payees ──────────────────────────────────────────────────────────────
+
+    async def list_payees(self, budget_id: str) -> list[dict]:
+        """List all payees in a budget."""
+        data = await self._request("GET", f"/budgets/{budget_id}/payees")
+        return data.get("data", {}).get("payees", [])
+
+    # ── Transactions ────────────────────────────────────────────────────────
+
+    async def create_transactions(
+        self,
+        budget_id: str,
+        transactions: list[dict],
+    ) -> dict:
+        """Create one or more transactions in a budget.
+
+        Args:
+            budget_id: The YNAB budget UUID.
+            transactions: List of transaction dicts conforming to YNAB's API spec.
+                Each must have: account_id, date, amount.
+                Optional: payee_name, memo, cleared, approved, category_id.
+
+        Returns:
+            Dict with 'transaction_ids', 'duplicate_import_ids', etc.
+        """
+        body = {"transactions": transactions}
+        data = await self._request("POST", f"/budgets/{budget_id}/transactions", json_body=body)
+        return data.get("data", {})
+
+
+# Module-level singleton for convenience
+ynab_client = YNABClient()

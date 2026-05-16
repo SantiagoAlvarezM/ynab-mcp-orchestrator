@@ -1,0 +1,33 @@
+name: Jules PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+    # Skip draft PRs and bot-authored PRs
+    if: >
+      github.event.pull_request.draft == false &&
+      !contains(github.event.pull_request.user.login, '[bot]')
+    steps:
+      - uses: google-labs-code/jules-invoke@v1
+        with:
+          prompt: |
+            Review this pull request for the YNAB MCP Orchestrator project.
+            Focus on:
+            1. Code quality and Python best practices
+            2. Security issues (especially around API tokens and file access)
+            3. Potential bugs or edge cases
+            4. Type safety and Pydantic model correctness
+            5. Async/await correctness in YNAB client and tools
+            6. Test coverage gaps
+            Be concise. Only flag real issues, not style preferences (ruff handles that).
+        env:
+          JULES_API_KEY: ${{ secrets.JULES_API_KEY }}
