@@ -95,7 +95,7 @@ def _read_pdf(path: Path, password: str | None = None) -> dict:
             )
 
     pages = []
-    for page_num, page in enumerate(doc, start=1):
+    for page_num, page in enumerate(doc, start=1):  # type: ignore
         text = page.get_text("text")
         if text.strip():
             pages.append(f"--- Page {page_num} ---\n{text}")
