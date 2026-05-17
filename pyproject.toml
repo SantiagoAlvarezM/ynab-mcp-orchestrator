@@ -28,6 +28,7 @@ dev = [
     "pyright>=1.1.0",
     "bandit>=1.7.0",
     "types-openpyxl",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.pytest.ini_options]

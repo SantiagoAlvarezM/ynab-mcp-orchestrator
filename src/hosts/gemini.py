@@ -116,8 +116,16 @@ class GeminiProvider(BaseLLMProvider):
                     if parts:
                         contents.append(types.Content(role="user", parts=parts))
 
-            elif role == "model" and isinstance(content, list):
-                contents.append(types.Content(role="model", parts=content))
+            elif role in ("model", "assistant"):
+                if isinstance(content, str):
+                    contents.append(
+                        types.Content(
+                            role="model",
+                            parts=[types.Part.from_text(text=content)],
+                        )
+                    )
+                elif isinstance(content, list):
+                    contents.append(types.Content(role="model", parts=content))
 
         config = types.GenerateContentConfig(
             tools=tools,
@@ -165,7 +173,7 @@ class GeminiProvider(BaseLLMProvider):
     def get_assistant_message(self) -> dict[str, Any]:
         """Return the raw message representing the model's response."""
         return {
-            "role": "model",
+            "role": "assistant",
             "content": self._last_parts,
         }
 
