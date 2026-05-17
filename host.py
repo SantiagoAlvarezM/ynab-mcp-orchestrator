@@ -85,13 +85,17 @@ async def main(provider_name: str, model: str | None = None) -> None:
 
     try:
         # 1. Connect to the MCP server via stdio
+        server_env = {
+            "PATH": os.environ.get("PATH", ""),
+            "YNAB_PAT": os.environ.get("YNAB_PAT", ""),
+            "YNAB_BASE_URL": os.environ.get("YNAB_BASE_URL", ""),
+            "STATEMENTS_DIR": os.environ.get("STATEMENTS_DIR", ""),
+        }
+
         server_params = StdioServerParameters(
             command="uv",
             args=["run", SERVER_SCRIPT],
-            env={
-                **os.environ,
-                # Ensure the server inherits our env (YNAB_PAT, etc.)
-            },
+            env=server_env,
         )
 
         stdio_transport = await exit_stack.enter_async_context(
@@ -134,7 +138,21 @@ async def main(provider_name: str, model: str | None = None) -> None:
 
             print(f"\n{provider.name} is thinking...\n")
 
+            # Maintain turn alternation (Anthropic will crash if two user messages are sent consecutively)
+            if messages_history and messages_history[-1]["role"] == "user":
+                messages_history.append(
+                    {"role": "assistant", "content": "I am ready for the next request."}
+                )
+
             messages_history.append({"role": "user", "content": query})
+
+            # Implement sliding window to prevent unbounded context growth
+            if len(messages_history) > 20:
+                # Keep system prompt at [0], and keep the last 18 messages
+                messages_history = [messages_history[0], *messages_history[-18:]]
+                # Ensure the truncated history starts with a 'user' message after the system prompt
+                if len(messages_history) > 1 and messages_history[1]["role"] == "assistant":
+                    messages_history.pop(1)
 
             try:
                 response = await provider.run_agentic_loop(

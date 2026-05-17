@@ -7,6 +7,7 @@ Requires the GEMINI_API_KEY (or GOOGLE_API_KEY) environment variable.
 from __future__ import annotations
 
 import os
+import uuid
 from typing import Any
 
 from google import genai
@@ -143,7 +144,7 @@ class GeminiProvider(BaseLLMProvider):
                     fc = part.function_call
                     tool_calls.append(
                         ToolCall(
-                            id=fc.name,  # Gemini doesn't use separate IDs
+                            id=uuid.uuid4().hex,  # Unique ID to avoid identical IDs for parallel calls
                             name=fc.name,
                             arguments=dict(fc.args) if fc.args else {},
                         )

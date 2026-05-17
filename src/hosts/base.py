@@ -7,6 +7,7 @@ model produces a final text response.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -14,6 +15,7 @@ from typing import Any
 
 from mcp import ClientSession
 from mcp.types import Tool as MCPTool
+from rich.prompt import Confirm
 
 
 @dataclass
@@ -91,23 +93,38 @@ class BaseLLMProvider(ABC):
             if response.text:
                 output_parts.append(response.text)
 
-            messages.append(self.get_assistant_message())
+            assistant_msg = self.get_assistant_message()
+            if assistant_msg.get("content"):
+                messages.append(assistant_msg)
 
             if not response.tool_calls:
                 # Model is done — no more tool calls
                 break
 
-            tool_results = []
+            # 1. Prompt for human-in-the-loop approvals sequentially
+            approved_tools = []
             for tc in response.tool_calls:
                 print(f"  🔧 [{tc.name}] {json.dumps(tc.arguments, ensure_ascii=False)}")
+                if tc.name in {"create_ynab_transactions"} and not Confirm.ask(
+                    f"[bold red]⚠️  Approve execution of {tc.name}?[/bold red]"
+                ):
+                    approved_tools.append((tc, False))
+                    continue
+                approved_tools.append((tc, True))
 
+            # 2. Run approved tools concurrently
+            async def run_tool(tool_call: ToolCall, is_approved: bool) -> tuple[ToolCall, str]:
+                if not is_approved:
+                    return tool_call, "User denied the operation."
                 try:
-                    result = await session.call_tool(tc.name, tc.arguments)
-                    tool_output = _extract_tool_text(result)
+                    result = await session.call_tool(tool_call.name, tool_call.arguments)
+                    return tool_call, _extract_tool_text(result)
                 except Exception as exc:
-                    tool_output = f"⚠️  Tool error: {exc}"
+                    return tool_call, f"⚠️  Tool error: {exc}"
 
-                tool_results.append((tc, tool_output))
+            tool_results = await asyncio.gather(
+                *(run_tool(tc, is_approved) for tc, is_approved in approved_tools)
+            )
 
             messages.append(self.build_tool_results_message(tool_results))
 
