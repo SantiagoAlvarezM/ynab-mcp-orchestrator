@@ -76,7 +76,7 @@ uv sync
 
 ### 3. Interactive AI Host (CLI)
 
-We provide a built-in interactive terminal host (`host.py`) that uses Anthropic (Claude) or Google (Gemini) to execute agentic workflows for you. It automatically preserves your conversational context, strictly uses human-readable names instead of UUIDs, and formats outputs beautifully using `rich` tables and color-coded JSON blocks.
+We provide a built-in interactive terminal host (`host.py`) that uses Anthropic (Claude) or Google (Gemini) to execute agentic workflows for you. It automatically preserves your conversational context, strictly uses human-readable names instead of UUIDs, proactively suggests creation of missing categories or payees, and formats outputs beautifully using `rich` tables and color-coded JSON blocks.
 
 Ensure you have added `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` to your `.env` file.
 
