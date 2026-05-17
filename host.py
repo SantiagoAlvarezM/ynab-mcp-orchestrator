@@ -53,6 +53,7 @@ Key rules:
     2. If there are multiple budgets or accounts and it is not obvious which one to use, ask the user to clarify.
     3. Whenever you display entities (budgets, accounts, categories, payees) to the user, ALWAYS use their human-readable NAMES, NEVER their raw UUIDs, so the user can easily understand them.
     4. Proactively offer to rollback/delete transactions if you made a mistake or if the user asks to revert.
+    5. If an account, category, or payee does not exist, ask the user if they want you to suggest them or create them. Do not just leave them uncategorized without offering help.
 """
 
 
@@ -157,9 +158,29 @@ async def main(provider_name: str, model: str | None = None) -> None:
             if len(messages_history) > 20:
                 # Keep system prompt at [0], and keep the last 18 messages
                 messages_history = [messages_history[0], *messages_history[-18:]]
-                # Ensure the truncated history starts with a 'user' message after the system prompt
-                if len(messages_history) > 1 and messages_history[1]["role"] == "assistant":
-                    messages_history.pop(1)
+
+                # Ensure the truncated history starts with a safe 'user' message
+                while len(messages_history) > 1:
+                    first_msg = messages_history[1]
+                    if first_msg["role"] == "assistant":
+                        messages_history.pop(1)
+                        continue
+
+                    # If it's a user message, check if it's an orphaned tool_result
+                    if first_msg["role"] == "user" and isinstance(first_msg.get("content"), list):
+                        is_tool_result = False
+                        for block in first_msg["content"]:
+                            if isinstance(block, dict) and (
+                                block.get("type") == "tool_result" or "function_response" in block
+                            ):
+                                is_tool_result = True
+                                break
+                        if is_tool_result:
+                            messages_history.pop(1)
+                            continue
+
+                    # If we get here, it's a safe user message
+                    break
 
             try:
                 response = await provider.run_agentic_loop(
