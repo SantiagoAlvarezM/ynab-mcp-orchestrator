@@ -95,6 +95,16 @@ uv run mcp dev server.py
 
 Opens a browser-based UI at `http://localhost:6274` where you can test all tools, resources, and prompts manually.
 
+**Troubleshooting MCP Inspector:**
+If your browser shows **"Error Connecting to MCP Inspector Proxy"** or your terminal says **"PORT IS IN USE"**, an old session might be stuck in the background. Free the ports by running:
+```bash
+fuser -k 6277/tcp && fuser -k 6274/tcp
+```
+If you encounter proxy authentication issues or don't want to deal with session tokens locally, you can disable the requirement:
+```bash
+DANGEROUSLY_OMIT_AUTH=true uv run mcp dev server.py
+```
+
 ### 5. Connect to Claude Desktop
 
 Add to your Claude Desktop MCP config (`~/.config/claude/claude_desktop_config.json`):
