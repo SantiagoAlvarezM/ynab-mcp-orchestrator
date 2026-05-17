@@ -145,6 +145,7 @@ This orchestrator is designed with strict security boundaries:
 - **Human-in-the-Loop:** The interactive host pauses and requires explicit terminal approval before executing any state-mutating actions (like creating YNAB transactions, accounts, payees, or categories).
 - **Prompt Injection Defense:** External statement data is wrapped in strict XML delimiters to prevent malicious payloads from hijacking the LLM's instructions.
 - **API Safety:** YNAB API identifiers are fully sanitized and URL-encoded.
+- **Credential Redaction:** Sensitive tool parameters (like bank statement passwords) are actively redacted from the interactive console logs to prevent local leakage.
 
 ## 📜 License
 
