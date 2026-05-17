@@ -15,6 +15,7 @@ def gemini_provider():
 
 def test_convert_tools(gemini_provider):
     """Test converting MCP tools to Gemini function declarations."""
+
     class FakeMCPTool:
         def __init__(self, name, description, input_schema):
             self.name = name
@@ -59,6 +60,7 @@ def test_get_assistant_message(gemini_provider):
 
 def test_build_tool_results_message(gemini_provider):
     """Test building tool results message."""
+
     class FakeToolCall:
         def __init__(self, name):
             self.name = name
