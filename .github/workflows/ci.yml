@@ -33,6 +33,12 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
 
+      - name: Pyright type check
+        run: uv run pyright
+
+      - name: Bandit security scan
+        run: uv run bandit -r src/
+
   test:
     name: Tests
     runs-on: ubuntu-latest
