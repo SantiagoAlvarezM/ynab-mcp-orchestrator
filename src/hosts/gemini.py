@@ -68,7 +68,7 @@ class GeminiProvider(BaseLLMProvider):
                 types.FunctionDeclaration(
                     name=tool.name,
                     description=tool.description or "",
-                    parameters=parameters,
+                    parameters=parameters,  # type: ignore
                 )
             )
 
@@ -145,7 +145,7 @@ class GeminiProvider(BaseLLMProvider):
                     tool_calls.append(
                         ToolCall(
                             id=uuid.uuid4().hex,  # Unique ID to avoid identical IDs for parallel calls
-                            name=fc.name,
+                            name=fc.name or "",
                             arguments=dict(fc.args) if fc.args else {},
                         )
                     )

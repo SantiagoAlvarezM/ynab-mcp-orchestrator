@@ -212,7 +212,7 @@ def _read_csv(path: Path, password: str | None = None) -> dict:
         "type": "text",
         "content": "\n".join(rows) if rows else "(Empty CSV file)",
         "pages": None,
-        "password_protected": False,
+        "password_protected": False,  # nosec B105
     }
 
 
@@ -230,5 +230,5 @@ def _read_image(path: Path, password: str | None = None) -> dict:
         ),
         "data": b64_data,
         "pages": None,
-        "password_protected": False,
+        "password_protected": False,  # nosec B105
     }
