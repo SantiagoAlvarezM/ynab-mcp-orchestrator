@@ -94,6 +94,13 @@ class YNABClient:
         data = await self._request("GET", f"/budgets/{budget_id}/accounts")
         return data.get("data", {}).get("accounts", [])
 
+    async def create_account(self, budget_id: str, name: str, type: str, balance: int = 0) -> dict:
+        """Create a new account in a budget."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
+        body = {"account": {"name": name, "type": type, "balance": balance}}
+        data = await self._request("POST", f"/budgets/{budget_id}/accounts", json_body=body)
+        return data.get("data", {}).get("account", {})
+
     # ── Categories ──────────────────────────────────────────────────────────
 
     async def list_categories(self, budget_id: str) -> list[dict]:
@@ -102,6 +109,13 @@ class YNABClient:
         data = await self._request("GET", f"/budgets/{budget_id}/categories")
         return data.get("data", {}).get("category_groups", [])
 
+    async def create_category(self, budget_id: str, name: str, category_group_id: str) -> dict:
+        """Create a new category in a budget."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
+        body = {"category": {"name": name, "category_group_id": category_group_id}}
+        data = await self._request("POST", f"/budgets/{budget_id}/categories", json_body=body)
+        return data.get("data", {}).get("category", {})
+
     # ── Payees ──────────────────────────────────────────────────────────────
 
     async def list_payees(self, budget_id: str) -> list[dict]:
@@ -109,6 +123,13 @@ class YNABClient:
         budget_id = urllib.parse.quote(budget_id, safe="")
         data = await self._request("GET", f"/budgets/{budget_id}/payees")
         return data.get("data", {}).get("payees", [])
+
+    async def create_payee(self, budget_id: str, name: str) -> dict:
+        """Create a new payee in a budget."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
+        body = {"payee": {"name": name}}
+        data = await self._request("POST", f"/budgets/{budget_id}/payees", json_body=body)
+        return data.get("data", {}).get("payee", {})
 
     # ── Transactions ────────────────────────────────────────────────────────
 

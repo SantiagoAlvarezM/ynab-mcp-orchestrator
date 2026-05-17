@@ -29,8 +29,10 @@ The server exposes tools, resources, and prompts that allow **any MCP-compatible
 │   • list_ynab_accounts       │
 │   • list_ynab_categories     │
 │   • get_ynab_payees          │
+│   • create_ynab_account      │
+│   • create_ynab_category     │
+│   • create_ynab_payee        │
 │   • create_ynab_transactions │
-│                              │
 │   Resources:                 │
 │   • Transaction Schema       │
 │   • Batch Schema             │
@@ -140,7 +142,7 @@ uv run server.py
 
 This orchestrator is designed with strict security boundaries:
 - **Path Traversal Protection:** Bank statement reads and directory listings are strictly locked to your configured `STATEMENTS_DIR`.
-- **Human-in-the-Loop:** The interactive host pauses and requires explicit terminal approval before executing any state-mutating actions (like creating YNAB transactions).
+- **Human-in-the-Loop:** The interactive host pauses and requires explicit terminal approval before executing any state-mutating actions (like creating YNAB transactions, accounts, payees, or categories).
 - **Prompt Injection Defense:** External statement data is wrapped in strict XML delimiters to prevent malicious payloads from hijacking the LLM's instructions.
 - **API Safety:** YNAB API identifiers are fully sanitized and URL-encoded.
 

@@ -97,6 +97,45 @@ async def get_ynab_payees(
         return json.dumps({"error": str(e)})
 
 
+async def create_ynab_account(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    name: str = Field(description="Name of the new account"),
+    type: str = Field(description="Type of account (e.g. 'checking', 'savings', 'creditCard')"),
+    balance: int = Field(default=0, description="Initial balance in milliunits"),
+) -> str:
+    """Create a new account in a YNAB budget."""
+    try:
+        account = await ynab_client.create_account(budget_id, name, type, balance)
+        return json.dumps(account, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+async def create_ynab_category(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    name: str = Field(description="Name of the new category"),
+    category_group_id: str = Field(description="UUID of the category group to place this in"),
+) -> str:
+    """Create a new category in a YNAB budget."""
+    try:
+        category = await ynab_client.create_category(budget_id, name, category_group_id)
+        return json.dumps(category, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+async def create_ynab_payee(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    name: str = Field(description="Name of the new payee"),
+) -> str:
+    """Create a new payee in a YNAB budget."""
+    try:
+        payee = await ynab_client.create_payee(budget_id, name)
+        return json.dumps(payee, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
 async def create_ynab_transactions(
     budget_id: str = Field(description="YNAB budget UUID"),
     transactions_json: str = Field(
