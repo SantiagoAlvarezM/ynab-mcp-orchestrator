@@ -19,6 +19,8 @@ import fitz  # pymupdf
 import msoffcrypto
 import openpyxl
 
+from src.config import STATEMENTS_DIR
+
 # ── Public API ──────────────────────────────────────────────────────────────
 
 
@@ -41,6 +43,11 @@ def read_file(file_path: str | Path, password: str | None = None) -> dict:
       - data: base64-encoded image bytes
     """
     path = Path(file_path).resolve()
+
+    if not path.is_relative_to(STATEMENTS_DIR):
+        raise PermissionError(
+            f"Access denied: '{path}' is outside the allowed statements directory."
+        )
 
     if not path.exists():
         raise FileNotFoundError(f"File not found: {path}")
