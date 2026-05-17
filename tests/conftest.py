@@ -2,6 +2,7 @@
 
 import csv
 import json
+from typing import Any
 
 import openpyxl
 import pytest
@@ -38,7 +39,7 @@ def sample_excel(tmp_statements_dir):
     """Create a sample Excel bank statement."""
     xlsx_path = tmp_statements_dir / "davivienda_mayo.xlsx"
     wb = openpyxl.Workbook()
-    ws = wb.active
+    ws: Any = wb.active
     ws.title = "Movimientos"
     ws.append(["Fecha", "Descripción", "Monto", "Saldo"])
     ws.append(["15/05/2026", "Compra TC *1234 Exito", -85000, 1200000])
