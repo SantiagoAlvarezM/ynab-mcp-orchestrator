@@ -136,6 +136,14 @@ uv run mcp dev server.py
 uv run server.py
 ```
 
+## 🔒 Security Features
+
+This orchestrator is designed with strict security boundaries:
+- **Path Traversal Protection:** Bank statement reads and directory listings are strictly locked to your configured `STATEMENTS_DIR`.
+- **Human-in-the-Loop:** The interactive host pauses and requires explicit terminal approval before executing any state-mutating actions (like creating YNAB transactions).
+- **Prompt Injection Defense:** External statement data is wrapped in strict XML delimiters to prevent malicious payloads from hijacking the LLM's instructions.
+- **API Safety:** YNAB API identifiers are fully sanitized and URL-encoded.
+
 ## 📜 License
 
 MIT
