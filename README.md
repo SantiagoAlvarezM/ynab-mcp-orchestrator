@@ -71,15 +71,29 @@ cp .env.example .env
 uv sync
 ```
 
-### 3. Test with MCP Inspector
+### 3. Interactive AI Host (CLI)
+
+We provide a built-in interactive terminal host (`host.py`) that uses Anthropic (Claude) or Google (Gemini) to execute agentic workflows for you. It automatically preserves your conversational context and formats outputs beautifully using `rich` tables and code blocks.
+
+Ensure you have added `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` to your `.env` file.
+
+```bash
+# Run with Claude (default)
+uv run host.py
+
+# Run with Gemini
+uv run host.py --provider gemini
+```
+
+### 4. Test with MCP Inspector
 
 ```bash
 uv run mcp dev server.py
 ```
 
-Opens a browser-based UI at `http://localhost:6274` where you can test all tools, resources, and prompts.
+Opens a browser-based UI at `http://localhost:6274` where you can test all tools, resources, and prompts manually.
 
-### 4. Connect to Claude Desktop
+### 5. Connect to Claude Desktop
 
 Add to your Claude Desktop MCP config (`~/.config/claude/claude_desktop_config.json`):
 
