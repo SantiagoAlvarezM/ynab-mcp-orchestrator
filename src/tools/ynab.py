@@ -179,3 +179,28 @@ async def create_ynab_transactions(
         return json.dumps({"error": f"Invalid JSON: {e}"})
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+async def delete_ynab_transactions(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    transaction_ids_json: str = Field(
+        description='JSON array of strings representing the transaction UUIDs to delete. e.g. ["uuid1", "uuid2"]',
+    ),
+) -> str:
+    """Delete (rollback) transactions in YNAB."""
+    try:
+        transaction_ids = json.loads(transaction_ids_json)
+
+        if not isinstance(transaction_ids, list):
+            return json.dumps({"error": "Expected a JSON array of transaction IDs."})
+
+        if not transaction_ids:
+            return json.dumps({"error": "Transaction ID list is empty."})
+
+        result = await ynab_client.delete_transactions(budget_id, transaction_ids)
+        return json.dumps(result, indent=2, ensure_ascii=False)
+
+    except json.JSONDecodeError as e:
+        return json.dumps({"error": f"Invalid JSON: {e}"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})

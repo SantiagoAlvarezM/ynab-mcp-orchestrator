@@ -154,6 +154,37 @@ class YNABClient:
         data = await self._request("POST", f"/budgets/{budget_id}/transactions", json_body=body)
         return data.get("data", {})
 
+    async def delete_transactions(
+        self,
+        budget_id: str,
+        transaction_ids: list[str],
+    ) -> dict:
+        """Delete one or more transactions in a budget.
+
+        Args:
+            budget_id: The YNAB budget UUID.
+            transaction_ids: List of transaction UUIDs to delete.
+
+        Returns:
+            Dict showing success count and failures.
+        """
+        budget_id = urllib.parse.quote(budget_id, safe="")
+        success_count = 0
+        failures = []
+
+        # YNAB API does not support bulk delete, so we loop
+        for tid in transaction_ids:
+            try:
+                await self._request(
+                    "DELETE",
+                    f"/budgets/{budget_id}/transactions/{urllib.parse.quote(tid, safe='')}",
+                )
+                success_count += 1
+            except Exception as e:
+                failures.append({"id": tid, "error": str(e)})
+
+        return {"success_count": success_count, "failed_count": len(failures), "failures": failures}
+
 
 # Module-level singleton for convenience
 ynab_client = YNABClient()
