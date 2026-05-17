@@ -22,6 +22,9 @@ from src.models.transaction import get_batch_schema, get_transaction_schema
 from src.tools.filesystem import list_bank_statements, read_bank_statement
 from src.tools.validation import validate_transactions
 from src.tools.ynab import (
+    create_ynab_account,
+    create_ynab_category,
+    create_ynab_payee,
     create_ynab_transactions,
     get_ynab_payees,
     list_ynab_accounts,
@@ -162,6 +165,42 @@ async def tool_create_ynab_transactions(
     ),
 ) -> str:
     return await create_ynab_transactions(budget_id, transactions_json)
+
+
+@mcp.tool(
+    name="create_ynab_account",
+    description="Create a new account in a YNAB budget.",
+)
+async def tool_create_ynab_account(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    name: str = Field(description="Name of the new account"),
+    type: str = Field(description="Type of account (e.g. 'checking', 'savings', 'creditCard')"),
+    balance: int = Field(default=0, description="Initial balance in milliunits"),
+) -> str:
+    return await create_ynab_account(budget_id, name, type, balance)
+
+
+@mcp.tool(
+    name="create_ynab_category",
+    description="Create a new category in a YNAB budget.",
+)
+async def tool_create_ynab_category(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    name: str = Field(description="Name of the new category"),
+    category_group_id: str = Field(description="UUID of the category group to place this in"),
+) -> str:
+    return await create_ynab_category(budget_id, name, category_group_id)
+
+
+@mcp.tool(
+    name="create_ynab_payee",
+    description="Create a new payee in a YNAB budget.",
+)
+async def tool_create_ynab_payee(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    name: str = Field(description="Name of the new payee"),
+) -> str:
+    return await create_ynab_payee(budget_id, name)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

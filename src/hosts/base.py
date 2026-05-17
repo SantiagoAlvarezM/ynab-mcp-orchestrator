@@ -105,9 +105,12 @@ class BaseLLMProvider(ABC):
             approved_tools = []
             for tc in response.tool_calls:
                 print(f"  🔧 [{tc.name}] {json.dumps(tc.arguments, ensure_ascii=False)}")
-                if tc.name in {"create_ynab_transactions"} and not Confirm.ask(
-                    f"[bold red]⚠️  Approve execution of {tc.name}?[/bold red]"
-                ):
+                if tc.name in {
+                    "create_ynab_transactions",
+                    "create_ynab_account",
+                    "create_ynab_category",
+                    "create_ynab_payee",
+                } and not Confirm.ask(f"[bold red]⚠️  Approve execution of {tc.name}?[/bold red]"):
                     approved_tools.append((tc, False))
                     continue
                 approved_tools.append((tc, True))
