@@ -63,7 +63,7 @@ class YNABClient:
                     error_json = response.json()
                     error_detail = error_json.get("error", {}).get("detail", response.text)
                 except Exception:
-                    pass
+                    pass  # nosec B110
 
                 raise httpx.HTTPStatusError(
                     f"YNAB API error ({response.status_code}): {error_detail}",
