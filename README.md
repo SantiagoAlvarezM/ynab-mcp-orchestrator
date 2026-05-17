@@ -33,6 +33,7 @@ The server exposes tools, resources, and prompts that allow **any MCP-compatible
 │   • create_ynab_category     │
 │   • create_ynab_payee        │
 │   • create_ynab_transactions │
+│   • delete_ynab_transactions │
 │   Resources:                 │
 │   • Transaction Schema       │
 │   • Batch Schema             │
@@ -75,7 +76,7 @@ uv sync
 
 ### 3. Interactive AI Host (CLI)
 
-We provide a built-in interactive terminal host (`host.py`) that uses Anthropic (Claude) or Google (Gemini) to execute agentic workflows for you. It automatically preserves your conversational context and formats outputs beautifully using `rich` tables and code blocks.
+We provide a built-in interactive terminal host (`host.py`) that uses Anthropic (Claude) or Google (Gemini) to execute agentic workflows for you. It automatically preserves your conversational context, strictly uses human-readable names instead of UUIDs, and formats outputs beautifully using `rich` tables and color-coded JSON blocks.
 
 Ensure you have added `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` to your `.env` file.
 
@@ -152,7 +153,7 @@ uv run server.py
 
 This orchestrator is designed with strict security boundaries:
 - **Path Traversal Protection:** Bank statement reads and directory listings are strictly locked to your configured `STATEMENTS_DIR`.
-- **Human-in-the-Loop:** The interactive host pauses and requires explicit terminal approval before executing any state-mutating actions (like creating YNAB transactions, accounts, payees, or categories).
+- **Human-in-the-Loop:** The interactive host pauses and requires explicit terminal approval before executing any state-mutating actions (like creating or deleting YNAB transactions, accounts, payees, or categories).
 - **Prompt Injection Defense:** External statement data is wrapped in strict XML delimiters to prevent malicious payloads from hijacking the LLM's instructions.
 - **API Safety:** YNAB API identifiers are fully sanitized and URL-encoded.
 - **Credential Redaction:** Sensitive tool parameters (like bank statement passwords) are actively redacted from the interactive console logs to prevent local leakage.
