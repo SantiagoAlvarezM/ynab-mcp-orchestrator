@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.draft == false &&
       !contains(github.event.pull_request.user.login, '[bot]')
     steps:
-      - uses: google-labs-code/jules-invoke@v1
+      - uses: google-labs-code/jules-invoke@main
         with:
           prompt: |
             Review this pull request for the YNAB MCP Orchestrator project.
