@@ -6,6 +6,7 @@ Reference: https://api.ynab.com/v1
 
 from __future__ import annotations
 
+import urllib.parse
 from typing import Any
 
 import httpx
@@ -81,6 +82,7 @@ class YNABClient:
 
     async def get_budget(self, budget_id: str) -> dict:
         """Get a specific budget."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
         data = await self._request("GET", f"/budgets/{budget_id}")
         return data.get("data", {}).get("budget", {})
 
@@ -88,6 +90,7 @@ class YNABClient:
 
     async def list_accounts(self, budget_id: str) -> list[dict]:
         """List all accounts in a budget."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
         data = await self._request("GET", f"/budgets/{budget_id}/accounts")
         return data.get("data", {}).get("accounts", [])
 
@@ -95,6 +98,7 @@ class YNABClient:
 
     async def list_categories(self, budget_id: str) -> list[dict]:
         """List all category groups and their categories in a budget."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
         data = await self._request("GET", f"/budgets/{budget_id}/categories")
         return data.get("data", {}).get("category_groups", [])
 
@@ -102,6 +106,7 @@ class YNABClient:
 
     async def list_payees(self, budget_id: str) -> list[dict]:
         """List all payees in a budget."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
         data = await self._request("GET", f"/budgets/{budget_id}/payees")
         return data.get("data", {}).get("payees", [])
 
@@ -123,6 +128,7 @@ class YNABClient:
         Returns:
             Dict with 'transaction_ids', 'duplicate_import_ids', etc.
         """
+        budget_id = urllib.parse.quote(budget_id, safe="")
         body = {"transactions": transactions}
         data = await self._request("POST", f"/budgets/{budget_id}/transactions", json_body=body)
         return data.get("data", {})

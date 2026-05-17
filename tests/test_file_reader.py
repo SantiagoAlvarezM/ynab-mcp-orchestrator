@@ -70,21 +70,21 @@ class TestReadImage:
 class TestReadFileErrors:
     """Tests for error handling."""
 
-    def test_file_not_found(self):
+    def test_file_not_found(self, tmp_statements_dir):
         with pytest.raises(FileNotFoundError):
-            read_file("/nonexistent/path/file.pdf")
+            read_file(tmp_statements_dir / "nonexistent.pdf")
 
-    def test_unsupported_format(self, tmp_path):
-        txt_file = tmp_path / "notes.txt"
+    def test_unsupported_format(self, tmp_statements_dir):
+        txt_file = tmp_statements_dir / "notes.txt"
         txt_file.write_text("hello")
         with pytest.raises(ValueError, match="Unsupported file format"):
             read_file(txt_file)
 
-    def test_password_required_error_message(self, tmp_path):
+    def test_password_required_error_message(self, tmp_statements_dir):
         """Encrypted files without password should raise clear error."""
         # We can't easily create a password-protected PDF in a test,
         # but we verify the error path exists for unsupported formats
-        bad_file = tmp_path / "data.doc"
+        bad_file = tmp_statements_dir / "data.doc"
         bad_file.write_text("fake")
         with pytest.raises(ValueError):
             read_file(bad_file)

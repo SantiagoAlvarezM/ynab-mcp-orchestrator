@@ -28,7 +28,15 @@ def list_bank_statements(
     """
     base = STATEMENTS_DIR
     if directory:
-        base = base / directory
+        base = (base / directory).resolve()
+
+    if not base.is_relative_to(STATEMENTS_DIR):
+        return json.dumps(
+            {
+                "error": f"Invalid directory path. Must be within {STATEMENTS_DIR}",
+                "statements_dir": str(STATEMENTS_DIR),
+            }
+        )
 
     if not base.exists():
         return json.dumps(
@@ -95,6 +103,10 @@ def read_bank_statement(
     """
     try:
         result = read_file(file_path, password=password or None)
+        # Isolate untrusted file content to prevent indirect prompt injection
+        if "content" in result and result.get("type") == "text":
+            result["content"] = f"<statement_data>\n{result['content']}\n</statement_data>"
+
         return json.dumps(result, indent=2, ensure_ascii=False)
     except FileNotFoundError as e:
         return json.dumps({"error": str(e)})

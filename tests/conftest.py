@@ -16,6 +16,13 @@ def tmp_statements_dir(tmp_path):
     return statements
 
 
+@pytest.fixture(autouse=True)
+def mock_statements_dir(monkeypatch, tmp_statements_dir):
+    """Patch STATEMENTS_DIR in modules to point to the temporary test directory."""
+    monkeypatch.setattr("src.services.file_reader.STATEMENTS_DIR", tmp_statements_dir)
+    monkeypatch.setattr("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir)
+
+
 @pytest.fixture
 def sample_csv(tmp_statements_dir):
     """Create a sample CSV bank statement."""

@@ -77,8 +77,8 @@ class TestReadBankStatement:
         result = json.loads(read_bank_statement("/nonexistent/file.pdf"))
         assert "error" in result
 
-    def test_unsupported_format_returns_error(self, tmp_path):
-        txt = tmp_path / "notes.txt"
+    def test_unsupported_format_returns_error(self, tmp_statements_dir):
+        txt = tmp_statements_dir / "notes.txt"
         txt.write_text("hello")
         result = json.loads(read_bank_statement(str(txt)))
         assert "error" in result
