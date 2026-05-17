@@ -39,15 +39,15 @@ class TestTransactionCreate:
 
     def test_missing_date_raises(self):
         with pytest.raises(ValidationError):
-            TransactionCreate(amount=-50000)
+            TransactionCreate.model_validate({"amount": -50000})
 
     def test_missing_amount_raises(self):
         with pytest.raises(ValidationError):
-            TransactionCreate(date="2026-05-15")
+            TransactionCreate.model_validate({"date": "2026-05-15"})
 
     def test_invalid_amount_type_raises(self):
         with pytest.raises(ValidationError):
-            TransactionCreate(date="2026-05-15", amount="not-a-number")
+            TransactionCreate.model_validate({"date": "2026-05-15", "amount": "not-a-number"})
 
     def test_serialization_roundtrip(self):
         txn = TransactionCreate(
