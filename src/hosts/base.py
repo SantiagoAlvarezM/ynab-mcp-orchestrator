@@ -104,7 +104,11 @@ class BaseLLMProvider(ABC):
             # 1. Prompt for human-in-the-loop approvals sequentially
             approved_tools = []
             for tc in response.tool_calls:
-                print(f"  🔧 [{tc.name}] {json.dumps(tc.arguments, ensure_ascii=False)}")
+                safe_args = {
+                    k: ("[REDACTED]" if "password" in k.lower() and v else v)
+                    for k, v in tc.arguments.items()
+                }
+                print(f"  🔧 [{tc.name}] {json.dumps(safe_args, ensure_ascii=False)}")
                 if tc.name in {
                     "create_ynab_transactions",
                     "create_ynab_account",
