@@ -108,12 +108,33 @@ class BaseLLMProvider(ABC):
                     k: ("[REDACTED]" if "password" in k.lower() and v else v)
                     for k, v in tc.arguments.items()
                 }
-                print(f"  🔧 [{tc.name}] {json.dumps(safe_args, ensure_ascii=False)}")
+
+                from rich.console import Console
+                from rich.syntax import Syntax
+
+                console = Console()
+                console.print(f"  [bold blue]🔧 [{tc.name}][/bold blue]")
+                for k, v in safe_args.items():
+                    if isinstance(v, str) and (
+                        v.strip().startswith("{") or v.strip().startswith("[")
+                    ):
+                        try:
+                            parsed = json.loads(v)
+                            pretty = json.dumps(parsed, indent=2, ensure_ascii=False)
+                            syntax = Syntax(pretty, "json", theme="monokai", word_wrap=True)
+                            console.print(f"      [bold cyan]{k}:[/bold cyan]")
+                            console.print(syntax)
+                            continue
+                        except json.JSONDecodeError:
+                            pass
+                    console.print(f"      [bold cyan]{k}:[/bold cyan] {v}")
+
                 if tc.name in {
                     "create_ynab_transactions",
                     "create_ynab_account",
                     "create_ynab_category",
                     "create_ynab_payee",
+                    "delete_ynab_transactions",
                 } and not Confirm.ask(f"[bold red]⚠️  Approve execution of {tc.name}?[/bold red]"):
                     approved_tools.append((tc, False))
                     continue

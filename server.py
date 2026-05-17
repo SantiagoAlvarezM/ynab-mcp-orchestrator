@@ -26,6 +26,7 @@ from src.tools.ynab import (
     create_ynab_category,
     create_ynab_payee,
     create_ynab_transactions,
+    delete_ynab_transactions,
     get_ynab_payees,
     list_ynab_accounts,
     list_ynab_budgets,
@@ -165,6 +166,19 @@ async def tool_create_ynab_transactions(
     ),
 ) -> str:
     return await create_ynab_transactions(budget_id, transactions_json)
+
+
+@mcp.tool(
+    name="delete_ynab_transactions",
+    description="Delete or rollback transactions in YNAB using their IDs.",
+)
+async def tool_delete_ynab_transactions(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    transaction_ids_json: str = Field(
+        description="JSON array of strings representing the transaction UUIDs to delete.",
+    ),
+) -> str:
+    return await delete_ynab_transactions(budget_id, transaction_ids_json)
 
 
 @mcp.tool(
