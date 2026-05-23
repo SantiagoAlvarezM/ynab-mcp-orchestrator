@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import Any
 
@@ -14,12 +13,12 @@ from src.models.transaction import (
 )
 
 
-def validate_transactions(transactions: list[dict[str, Any]]) -> str:
+def validate_transactions(transactions: list[dict[str, Any]]) -> ValidationResult:
     """Validate extracted transactions against the YNAB transaction schema.
 
-    Returns a ValidationResult JSON with detailed errors and warnings.
-    Use this before calling create_ynab_transactions to iterate on errors
-    without invoking the destructive create.
+    Returns a ValidationResult with detailed errors and warnings. Use this
+    before calling create_ynab_transactions to iterate on errors without
+    invoking the destructive create.
     """
     errors: list[str] = []
     warnings: list[str] = []
@@ -37,7 +36,7 @@ def validate_transactions(transactions: list[dict[str, Any]]) -> str:
                 field = " -> ".join(str(loc) for loc in err["loc"])
                 errors.append(f"Transaction {idx}: {field} - {err['msg']}")
 
-    result = ValidationResult(
+    return ValidationResult(
         is_valid=len(errors) == 0,
         total_transactions=total,
         valid_count=valid_count,
@@ -45,7 +44,6 @@ def validate_transactions(transactions: list[dict[str, Any]]) -> str:
         errors=errors,
         warnings=warnings,
     )
-    return json.dumps(result.model_dump(), indent=2)
 
 
 def _semantic_checks(txn: TransactionCreate, idx: int, warnings: list[str]) -> None:

@@ -1,6 +1,5 @@
 """Tests for filesystem tools (list and read bank statements)."""
 
-import json
 from unittest.mock import patch
 
 import pytest
@@ -14,7 +13,7 @@ class TestListBankStatements:
 
     def test_lists_csv_files(self, sample_csv, tmp_statements_dir):
         with patch("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir):
-            result = json.loads(list_bank_statements(""))
+            result = list_bank_statements("")
             assert result["total_files"] == 1
             assert result["files"][0]["name"] == "bancolombia_mayo.csv"
             assert result["files"][0]["extension"] == ".csv"
@@ -23,7 +22,7 @@ class TestListBankStatements:
         self, sample_csv, sample_excel, sample_image, tmp_statements_dir
     ):
         with patch("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir):
-            result = json.loads(list_bank_statements(""))
+            result = list_bank_statements("")
             assert result["total_files"] == 3
             extensions = {f["extension"] for f in result["files"]}
             assert extensions == {".csv", ".xlsx", ".png"}
@@ -35,7 +34,7 @@ class TestListBankStatements:
         (sub / "test.csv").write_text("a,b,c\n1,2,3")
 
         with patch("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir):
-            result = json.loads(list_bank_statements("mayo_2026"))
+            result = list_bank_statements("mayo_2026")
             assert result["total_files"] == 1
 
     def test_nonexistent_directory(self, tmp_statements_dir):
@@ -47,7 +46,7 @@ class TestListBankStatements:
 
     def test_empty_directory(self, tmp_statements_dir):
         with patch("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir):
-            result = json.loads(list_bank_statements(""))
+            result = list_bank_statements("")
             assert result["total_files"] == 0
 
     def test_ignores_unsupported_files(self, tmp_statements_dir):
@@ -56,7 +55,7 @@ class TestListBankStatements:
         (tmp_statements_dir / "real.csv").write_text("a,b\n1,2")
 
         with patch("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir):
-            result = json.loads(list_bank_statements(""))
+            result = list_bank_statements("")
             assert result["total_files"] == 1  # only .csv
 
 

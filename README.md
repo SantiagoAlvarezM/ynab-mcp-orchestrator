@@ -28,7 +28,7 @@ The server exposes tools, resources, and prompts that allow **any MCP-compatible
 │   • list_ynab_budgets        │
 │   • list_ynab_accounts       │
 │   • list_ynab_categories     │
-│   • get_ynab_payees          │
+│   • list_ynab_payees         │
 │   • create_ynab_account      │
 │   • create_ynab_category     │
 │   • create_ynab_payee        │

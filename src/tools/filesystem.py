@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import Any
 
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ContentBlock, ImageContent, TextContent
@@ -13,7 +14,7 @@ from src.models.transaction import StatementFile
 from src.services.file_reader import read_file
 
 
-def list_bank_statements(directory: str = "") -> str:
+def list_bank_statements(directory: str = "") -> dict[str, Any]:
     """List bank statement files available for processing.
 
     Scans the configured statements directory for supported file types
@@ -35,7 +36,7 @@ def list_bank_statements(directory: str = "") -> str:
             "or create the directory first."
         )
 
-    files: list[dict] = []
+    files: list[dict[str, Any]] = []
     for file_path in sorted(base.rglob("*")):
         if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_EXTENSIONS:
             stat = file_path.stat()
@@ -48,15 +49,11 @@ def list_bank_statements(directory: str = "") -> str:
             )
             files.append(sf.model_dump())
 
-    return json.dumps(
-        {
-            "directory": str(base),
-            "total_files": len(files),
-            "files": files,
-        },
-        indent=2,
-        ensure_ascii=False,
-    )
+    return {
+        "directory": str(base),
+        "total_files": len(files),
+        "files": files,
+    }
 
 
 def read_bank_statement(file_path: str, password: str = "") -> list[ContentBlock]:

@@ -20,7 +20,7 @@ from mcp.types import ContentBlock
 from pydantic import Field
 
 from src.config import STATEMENTS_DIR
-from src.models.transaction import get_batch_schema, get_transaction_schema
+from src.models.transaction import ValidationResult, get_batch_schema, get_transaction_schema
 from src.tools.filesystem import list_bank_statements, read_bank_statement
 from src.tools.validation import validate_transactions
 from src.tools.ynab import (
@@ -29,10 +29,10 @@ from src.tools.ynab import (
     create_ynab_payee,
     create_ynab_transactions,
     delete_ynab_transactions,
-    get_ynab_payees,
     list_ynab_accounts,
     list_ynab_budgets,
     list_ynab_categories,
+    list_ynab_payees,
 )
 
 # ── Server Instance ─────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ def tool_list_bank_statements(
             "Leave empty to list all files recursively."
         ),
     ),
-) -> str:
+) -> dict[str, Any]:
     return list_bank_statements(directory)
 
 
@@ -108,7 +108,7 @@ def tool_validate_transactions(
             "the schema exposed at resource ynab://schema/transaction."
         ),
     ),
-) -> str:
+) -> ValidationResult:
     return validate_transactions(transactions)
 
 
@@ -116,7 +116,7 @@ def tool_validate_transactions(
     name="list_ynab_budgets",
     description="List all YNAB budgets accessible with the configured token.",
 )
-async def tool_list_ynab_budgets() -> str:
+async def tool_list_ynab_budgets() -> list[dict[str, Any]]:
     return await list_ynab_budgets()
 
 
@@ -128,7 +128,7 @@ async def tool_list_ynab_budgets() -> str:
 )
 async def tool_list_ynab_accounts(
     budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
+) -> list[dict[str, Any]]:
     return await list_ynab_accounts(budget_id)
 
 
@@ -141,20 +141,20 @@ async def tool_list_ynab_accounts(
 )
 async def tool_list_ynab_categories(
     budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
+) -> list[dict[str, Any]]:
     return await list_ynab_categories(budget_id)
 
 
 @mcp.tool(
-    name="get_ynab_payees",
+    name="list_ynab_payees",
     description=(
         "List all payees in a YNAB budget. Useful for matching extracted names to existing payees."
     ),
 )
-async def tool_get_ynab_payees(
+async def tool_list_ynab_payees(
     budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
-    return await get_ynab_payees(budget_id)
+) -> list[dict[str, Any]]:
+    return await list_ynab_payees(budget_id)
 
 
 @mcp.tool(
@@ -173,7 +173,7 @@ async def tool_create_ynab_transactions(
             "ynab://schema/transaction for the expected per-item shape."
         ),
     ),
-) -> str:
+) -> dict[str, Any]:
     return await create_ynab_transactions(budget_id, transactions)
 
 
@@ -186,7 +186,7 @@ async def tool_delete_ynab_transactions(
     transaction_ids: list[str] = Field(
         description="Array of YNAB transaction UUIDs to delete.",
     ),
-) -> str:
+) -> dict[str, Any]:
     return await delete_ynab_transactions(budget_id, transaction_ids)
 
 
@@ -218,7 +218,7 @@ async def tool_create_ynab_account(
         description="YNAB account type. Must be one of the allowed values.",
     ),
     balance: int = Field(default=0, description="Initial balance in milliunits"),
-) -> str:
+) -> dict[str, Any]:
     return await create_ynab_account(budget_id, name, account_type, balance)
 
 
@@ -230,7 +230,7 @@ async def tool_create_ynab_category(
     budget_id: str = Field(description="YNAB budget UUID"),
     name: str = Field(description="Name of the new category"),
     category_group_id: str = Field(description="UUID of the category group to place this in"),
-) -> str:
+) -> dict[str, Any]:
     return await create_ynab_category(budget_id, name, category_group_id)
 
 
@@ -241,7 +241,7 @@ async def tool_create_ynab_category(
 async def tool_create_ynab_payee(
     budget_id: str = Field(description="YNAB budget UUID"),
     name: str = Field(description="Name of the new payee"),
-) -> str:
+) -> dict[str, Any]:
     return await create_ynab_payee(budget_id, name)
 
 
