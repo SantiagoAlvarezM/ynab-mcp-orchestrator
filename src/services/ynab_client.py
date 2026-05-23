@@ -15,7 +15,12 @@ from src.config import YNAB_BASE_URL, YNAB_PAT
 
 
 class YNABClient:
-    """Async client for the YNAB REST API."""
+    """Async client for the YNAB REST API.
+
+    Holds a single long-lived httpx.AsyncClient so connections are pooled
+    across calls. Callers should invoke `aclose()` at shutdown — the
+    FastMCP lifespan in server.py wires this up.
+    """
 
     def __init__(
         self,
@@ -24,6 +29,7 @@ class YNABClient:
     ):
         self._base_url = base_url.rstrip("/")
         self._pat = pat
+        self._http: httpx.AsyncClient | None = None
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -37,6 +43,22 @@ class YNABClient:
                 "YNAB Personal Access Token not configured. Set YNAB_PAT in your .env file."
             )
 
+    def _get_http(self) -> httpx.AsyncClient:
+        """Return the shared httpx client, lazily creating it on first use."""
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(
+                base_url=self._base_url,
+                headers=self._headers(),
+                timeout=30.0,
+            )
+        return self._http
+
+    async def aclose(self) -> None:
+        """Close the underlying HTTP connection pool. Idempotent."""
+        if self._http is not None and not self._http.is_closed:
+            await self._http.aclose()
+        self._http = None
+
     async def _request(
         self,
         method: str,
@@ -45,33 +67,25 @@ class YNABClient:
     ) -> dict[str, Any]:
         """Make an authenticated request to the YNAB API."""
         self._ensure_configured()
+        http = self._get_http()
 
-        url = f"{self._base_url}{path}"
+        response = await http.request(method=method, url=path, json=json_body)
 
-        async with httpx.AsyncClient() as client:
-            response = await client.request(
-                method=method,
-                url=url,
-                headers=self._headers(),
-                json=json_body,
-                timeout=30.0,
+        if response.status_code >= 400:
+            error_detail = response.text
+            try:
+                error_json = response.json()
+                error_detail = error_json.get("error", {}).get("detail", response.text)
+            except Exception:
+                pass  # nosec B110
+
+            raise httpx.HTTPStatusError(
+                f"YNAB API error ({response.status_code}): {error_detail}",
+                request=response.request,
+                response=response,
             )
 
-            if response.status_code >= 400:
-                error_detail = response.text
-                try:
-                    error_json = response.json()
-                    error_detail = error_json.get("error", {}).get("detail", response.text)
-                except Exception:
-                    pass  # nosec B110
-
-                raise httpx.HTTPStatusError(
-                    f"YNAB API error ({response.status_code}): {error_detail}",
-                    request=response.request,
-                    response=response,
-                )
-
-            return response.json()
+        return response.json()
 
     # ── Budgets ─────────────────────────────────────────────────────────────
 
@@ -94,10 +108,12 @@ class YNABClient:
         data = await self._request("GET", f"/budgets/{budget_id}/accounts")
         return data.get("data", {}).get("accounts", [])
 
-    async def create_account(self, budget_id: str, name: str, type: str, balance: int = 0) -> dict:
+    async def create_account(
+        self, budget_id: str, name: str, account_type: str, balance: int = 0
+    ) -> dict:
         """Create a new account in a budget."""
         budget_id = urllib.parse.quote(budget_id, safe="")
-        body = {"account": {"name": name, "type": type, "balance": balance}}
+        body = {"account": {"name": name, "type": account_type, "balance": balance}}
         data = await self._request("POST", f"/budgets/{budget_id}/accounts", json_body=body)
         return data.get("data", {}).get("account", {})
 
@@ -186,5 +202,4 @@ class YNABClient:
         return {"success_count": success_count, "failed_count": len(failures), "failures": failures}
 
 
-# Module-level singleton for convenience
 ynab_client = YNABClient()

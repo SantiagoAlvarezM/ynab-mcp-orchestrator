@@ -87,6 +87,15 @@ class BaseLLMProvider(ABC):
         native_tools = self.convert_tools(mcp_tools)
         output_parts: list[str] = []
 
+        # Build the approval gate from each tool's MCP annotations rather than
+        # a hard-coded name list — any tool the server marks as not read-only
+        # requires the user's explicit OK before it runs.
+        needs_approval = {
+            tool.name
+            for tool in mcp_tools
+            if tool.annotations is not None and tool.annotations.readOnlyHint is False
+        }
+
         for _iteration in range(max_iterations):
             response = await self.send_message(messages, native_tools)
 
@@ -129,13 +138,9 @@ class BaseLLMProvider(ABC):
                             pass
                     console.print(f"      [bold cyan]{k}:[/bold cyan] {v}")
 
-                if tc.name in {
-                    "create_ynab_transactions",
-                    "create_ynab_account",
-                    "create_ynab_category",
-                    "create_ynab_payee",
-                    "delete_ynab_transactions",
-                } and not Confirm.ask(f"[bold red]⚠️  Approve execution of {tc.name}?[/bold red]"):
+                if tc.name in needs_approval and not Confirm.ask(
+                    f"[bold red]⚠️  Approve execution of {tc.name}?[/bold red]"
+                ):
                     approved_tools.append((tc, False))
                     continue
                 approved_tools.append((tc, True))

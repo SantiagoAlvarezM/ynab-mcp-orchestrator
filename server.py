@@ -12,13 +12,19 @@ Usage:
 """
 
 import json
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any, Literal, cast
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.prompts import base
+from mcp.types import ContentBlock, ToolAnnotations
 from pydantic import Field
 
 from src.config import STATEMENTS_DIR
-from src.models.transaction import get_batch_schema, get_transaction_schema
+from src.models.transaction import ValidationResult, get_batch_schema, get_transaction_schema
+from src.services.ynab_client import ynab_client
 from src.tools.filesystem import list_bank_statements, read_bank_statement
 from src.tools.validation import validate_transactions
 from src.tools.ynab import (
@@ -27,23 +33,56 @@ from src.tools.ynab import (
     create_ynab_payee,
     create_ynab_transactions,
     delete_ynab_transactions,
-    get_ynab_payees,
     list_ynab_accounts,
     list_ynab_budgets,
     list_ynab_categories,
+    list_ynab_payees,
 )
 
 # ── Server Instance ─────────────────────────────────────────────────────────
 
+
+@asynccontextmanager
+async def lifespan(_server: FastMCP) -> AsyncIterator[None]:
+    """Server lifecycle: keep the YNAB HTTP connection pool open for the
+    duration of the session and close it cleanly on shutdown."""
+    try:
+        yield
+    finally:
+        await ynab_client.aclose()
+
+
+_LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+_Transport = Literal["stdio", "sse", "streamable-http"]
+
 mcp = FastMCP(
     "YNAB MCP Orchestrator",
-    log_level="ERROR",
+    log_level=cast(_LogLevel, os.getenv("YNAB_MCP_LOG_LEVEL", "ERROR")),
+    lifespan=lifespan,
 )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # TOOLS
 # ═══════════════════════════════════════════════════════════════════════════
+
+# Annotations: declare each tool's behavior so hosts can gate destructive
+# calls behind explicit user approval without hard-coding tool names.
+_READ_LOCAL = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
+_READ_YNAB = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
+_DESTRUCTIVE_YNAB = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=False,
+    openWorldHint=True,
+)
+_ADDITIVE_YNAB = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=True,
+)
+_PURE = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
 
 
 @mcp.tool(
@@ -52,6 +91,7 @@ mcp = FastMCP(
         "List bank statement files (PDF, Excel, CSV, images) in the "
         "configured statements directory. Optionally filter by subdirectory."
     ),
+    annotations=_READ_LOCAL,
 )
 def tool_list_bank_statements(
     directory: str = Field(
@@ -61,7 +101,7 @@ def tool_list_bank_statements(
             "Leave empty to list all files recursively."
         ),
     ),
-) -> str:
+) -> dict[str, Any]:
     return list_bank_statements(directory)
 
 
@@ -69,12 +109,15 @@ def tool_list_bank_statements(
     name="read_bank_statement",
     description=(
         "Read and extract content from a bank statement file. "
-        "Returns raw text for PDF/Excel/CSV, or base64-encoded image for images. "
+        "Returns a TextContent block for PDF/Excel/CSV, or TextContent + "
+        "ImageContent for images so the host vision model can read them natively. "
         "Supports password-protected PDF and Excel files. "
         "Use the 'extract_transactions' prompt to process the extracted content."
     ),
+    annotations=_READ_LOCAL,
 )
-def tool_read_bank_statement(
+async def tool_read_bank_statement(
+    ctx: Context,
     file_path: str = Field(
         description="Absolute path to the bank statement file.",
     ),
@@ -86,31 +129,39 @@ def tool_read_bank_statement(
             "Leave empty if the file is not password-protected."
         ),
     ),
-) -> str:
-    return read_bank_statement(file_path, password)
+) -> list[ContentBlock]:
+    await ctx.info(f"Reading bank statement: {file_path}")
+    blocks = read_bank_statement(file_path, password)
+    await ctx.info(f"Extracted {len(blocks)} content block(s) from statement")
+    return blocks
 
 
 @mcp.tool(
     name="validate_transactions",
     description=(
         "Validate extracted transactions against the YNAB schema. "
-        "Call this BEFORE creating transactions to catch errors early. "
-        "Accepts a JSON string (array or batch object with 'transactions' key)."
+        "Call this BEFORE create_ynab_transactions to catch structural errors and "
+        "surface semantic warnings (zero amounts, missing account_id, unusual dates)."
     ),
+    annotations=_PURE,
 )
 def tool_validate_transactions(
-    transactions_json: str = Field(
-        description="JSON string of transactions to validate.",
+    transactions: list[dict[str, Any]] = Field(
+        description=(
+            "Array of transaction objects to validate. Each object should match "
+            "the schema exposed at resource ynab://schema/transaction."
+        ),
     ),
-) -> str:
-    return validate_transactions(transactions_json)
+) -> ValidationResult:
+    return validate_transactions(transactions)
 
 
 @mcp.tool(
     name="list_ynab_budgets",
     description="List all YNAB budgets accessible with the configured token.",
+    annotations=_READ_YNAB,
 )
-async def tool_list_ynab_budgets() -> str:
+async def tool_list_ynab_budgets() -> list[dict[str, Any]]:
     return await list_ynab_budgets()
 
 
@@ -119,10 +170,11 @@ async def tool_list_ynab_budgets() -> str:
     description=(
         "List all accounts in a YNAB budget. Returns account ID, name, type, and balance."
     ),
+    annotations=_READ_YNAB,
 )
 async def tool_list_ynab_accounts(
     budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
+) -> list[dict[str, Any]]:
     return await list_ynab_accounts(budget_id)
 
 
@@ -132,88 +184,117 @@ async def tool_list_ynab_accounts(
         "List all category groups and categories in a YNAB budget. "
         "Use category_id when categorizing transactions."
     ),
+    annotations=_READ_YNAB,
 )
 async def tool_list_ynab_categories(
     budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
+) -> list[dict[str, Any]]:
     return await list_ynab_categories(budget_id)
 
 
 @mcp.tool(
-    name="get_ynab_payees",
+    name="list_ynab_payees",
     description=(
         "List all payees in a YNAB budget. Useful for matching extracted names to existing payees."
     ),
+    annotations=_READ_YNAB,
 )
-async def tool_get_ynab_payees(
+async def tool_list_ynab_payees(
     budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
-    return await get_ynab_payees(budget_id)
+) -> list[dict[str, Any]]:
+    return await list_ynab_payees(budget_id)
 
 
 @mcp.tool(
     name="create_ynab_transactions",
     description=(
-        "Push validated transactions to a YNAB budget. "
+        "Push transactions to a YNAB budget. "
         "Each transaction MUST include account_id, date, and amount. "
         "Call validate_transactions first to catch errors."
     ),
+    annotations=_ADDITIVE_YNAB,
 )
 async def tool_create_ynab_transactions(
     budget_id: str = Field(description="YNAB budget UUID"),
-    transactions_json: str = Field(
-        description="JSON array of transaction objects to create.",
+    transactions: list[dict[str, Any]] = Field(
+        description=(
+            "Array of transaction objects to create. See resource "
+            "ynab://schema/transaction for the expected per-item shape."
+        ),
     ),
-) -> str:
-    return await create_ynab_transactions(budget_id, transactions_json)
+) -> dict[str, Any]:
+    return await create_ynab_transactions(budget_id, transactions)
 
 
 @mcp.tool(
     name="delete_ynab_transactions",
     description="Delete or rollback transactions in YNAB using their IDs.",
+    annotations=_DESTRUCTIVE_YNAB,
 )
 async def tool_delete_ynab_transactions(
     budget_id: str = Field(description="YNAB budget UUID"),
-    transaction_ids_json: str = Field(
-        description="JSON array of strings representing the transaction UUIDs to delete.",
+    transaction_ids: list[str] = Field(
+        description="Array of YNAB transaction UUIDs to delete.",
     ),
-) -> str:
-    return await delete_ynab_transactions(budget_id, transaction_ids_json)
+) -> dict[str, Any]:
+    return await delete_ynab_transactions(budget_id, transaction_ids)
+
+
+YnabAccountType = Literal[
+    "checking",
+    "savings",
+    "cash",
+    "creditCard",
+    "lineOfCredit",
+    "otherAsset",
+    "otherLiability",
+    "mortgage",
+    "autoLoan",
+    "studentLoan",
+    "personalLoan",
+    "medicalDebt",
+    "otherDebt",
+]
 
 
 @mcp.tool(
     name="create_ynab_account",
     description="Create a new account in a YNAB budget.",
+    annotations=_ADDITIVE_YNAB,
 )
 async def tool_create_ynab_account(
     budget_id: str = Field(description="YNAB budget UUID"),
     name: str = Field(description="Name of the new account"),
-    type: str = Field(description="Type of account (e.g. 'checking', 'savings', 'creditCard')"),
+    account_type: YnabAccountType = Field(
+        description="YNAB account type. Must be one of the allowed values.",
+    ),
     balance: int = Field(default=0, description="Initial balance in milliunits"),
-) -> str:
-    return await create_ynab_account(budget_id, name, type, balance)
+) -> dict[str, Any]:
+    return await create_ynab_account(budget_id, name, account_type, balance)
 
 
 @mcp.tool(
     name="create_ynab_category",
     description="Create a new category in a YNAB budget.",
+    annotations=_ADDITIVE_YNAB,
 )
 async def tool_create_ynab_category(
     budget_id: str = Field(description="YNAB budget UUID"),
     name: str = Field(description="Name of the new category"),
     category_group_id: str = Field(description="UUID of the category group to place this in"),
-) -> str:
+) -> dict[str, Any]:
     return await create_ynab_category(budget_id, name, category_group_id)
 
 
 @mcp.tool(
     name="create_ynab_payee",
     description="Create a new payee in a YNAB budget.",
+    annotations=_ADDITIVE_YNAB,
 )
 async def tool_create_ynab_payee(
     budget_id: str = Field(description="YNAB budget UUID"),
     name: str = Field(description="Name of the new payee"),
-) -> str:
+) -> dict[str, Any]:
     return await create_ynab_payee(budget_id, name)
 
 
@@ -272,8 +353,9 @@ def resource_supported_banks() -> str:
             "image": {
                 "extensions": [".png", ".jpg", ".jpeg"],
                 "description": (
-                    "Image-based statements — returned as base64 for LLM vision. "
-                    "Requires a multimodal LLM (Claude, GPT-4o, Gemini)."
+                    "Image-based statements — returned as MCP ImageContent for "
+                    "the host's vision pipeline. Requires a multimodal LLM "
+                    "(Claude, GPT-4o, Gemini)."
                 ),
             },
         },
@@ -355,7 +437,10 @@ transactions from a bank statement and return them as structured JSON.
 - Amounts may use dot (.) or comma (,) as decimal separator — handle both
 - Currency is Colombian Pesos (COP) unless stated otherwise
 - Set cleared="uncleared" and approved=false for all transactions
-- Do NOT set account_id or category_id yet — those come later
+- Leave category_id null; it gets assigned in the categorization step
+- account_id is required before pushing to YNAB; if the caller already
+  knows it, set it here, otherwise leave it null and ask the user which
+  account these transactions belong to before calling create_ynab_transactions
 
 ## Output Format
 Return ONLY a valid JSON array of transaction objects. No extra text.
@@ -392,18 +477,20 @@ categories to a batch of transactions.
 {transactions_json}
 </transactions>
 
-3. For EACH transaction, determine the most appropriate category based on
-   the payee name and memo. Assign the `category_id` field.
+3. For EACH transaction, pick the best-matching category from the list
+   returned by `list_ynab_categories` and assign its `id` to the
+   transaction's `category_id` field.
 
 ## Categorization Guidelines
-- Supermarkets/grocery stores → Groceries
-- Restaurants/cafés → Dining Out
-- Uber/DiDi/transport → Transportation
-- Netflix/Spotify/subscriptions → Subscriptions
-- Pharmacy/health → Healthcare
-- ATM withdrawals → can leave uncategorized
-- Salary/income → Income categories
-- If unsure, leave category_id as null
+- Match against the user's own categories — they may be in any language
+  (e.g. "Mercado", "Restaurantes", "Transporte") so do not translate or
+  invent categories that aren't in the returned list.
+- Use payee_name + memo as primary signals; type of expense (recurring vs
+  one-off) as a secondary signal.
+- ATM withdrawals and unclear payees may be left uncategorized
+  (category_id = null) rather than mis-categorized.
+- If no returned category fits, leave category_id as null and flag the
+  transaction in your summary so the user can categorize it manually.
 
 ## Output Format
 Return the COMPLETE transactions array with category_id populated where
@@ -451,7 +538,7 @@ Rules:
 - Set cleared="uncleared" and approved=false
 
 ## Step 3: Validate
-Call `validate_transactions` with the extracted JSON.
+Call `validate_transactions` with the extracted transactions array.
 If there are errors, fix them and re-validate.
 
 ## Step 4: Categorize
@@ -460,7 +547,7 @@ Assign category_id to each transaction based on the payee/memo.
 
 ## Step 5: Push to YNAB
 Call `create_ynab_transactions` with budget_id="{budget_id}" and the
-final transactions JSON.
+final `transactions` array.
 
 ## Step 6: Report
 Summarize what was done:
@@ -477,5 +564,17 @@ Summarize what was done:
 # ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════
 
+
+def main() -> None:
+    """Console script entry point.
+
+    Honors two env vars:
+      - YNAB_MCP_TRANSPORT: "stdio" (default), "streamable-http" or "sse"
+      - YNAB_MCP_LOG_LEVEL: overrides the default ERROR log level
+    """
+    transport = cast(_Transport, os.getenv("YNAB_MCP_TRANSPORT", "stdio"))
+    mcp.run(transport=transport)
+
+
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    main()

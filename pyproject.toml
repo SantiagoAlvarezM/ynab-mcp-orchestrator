@@ -5,7 +5,7 @@ description = "An intelligent MCP server that extracts financial data from bank 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp[cli]>=1.8.0",
+    "mcp[cli]>=1.18.0",
     "pymupdf>=1.25.0",
     "openpyxl>=3.1.0",
     "msoffcrypto-tool>=5.4.0",
@@ -56,3 +56,8 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastMCP requires `Field(...)` as the default for tool/prompt parameters
+# so it can extract description/default metadata into the MCP input schema.
+extend-immutable-calls = ["pydantic.Field"]

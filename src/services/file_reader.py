@@ -223,12 +223,8 @@ def _read_image(path: Path, password: str | None = None) -> dict:
 
     return {
         "type": "image",
-        "content": (
-            f"[Image file: {path.name} | "
-            f"Size: {len(image_bytes):,} bytes | "
-            f"Use the base64 data in the 'data' field to analyze this bank statement visually]"
-        ),
         "data": b64_data,
+        "size_bytes": len(image_bytes),
         "pages": None,
         "password_protected": False,  # nosec B105
     }
