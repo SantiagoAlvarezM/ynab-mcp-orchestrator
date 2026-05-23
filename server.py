@@ -349,8 +349,9 @@ def resource_supported_banks() -> str:
             "image": {
                 "extensions": [".png", ".jpg", ".jpeg"],
                 "description": (
-                    "Image-based statements — returned as base64 for LLM vision. "
-                    "Requires a multimodal LLM (Claude, GPT-4o, Gemini)."
+                    "Image-based statements — returned as MCP ImageContent for "
+                    "the host's vision pipeline. Requires a multimodal LLM "
+                    "(Claude, GPT-4o, Gemini)."
                 ),
             },
         },
@@ -432,7 +433,10 @@ transactions from a bank statement and return them as structured JSON.
 - Amounts may use dot (.) or comma (,) as decimal separator — handle both
 - Currency is Colombian Pesos (COP) unless stated otherwise
 - Set cleared="uncleared" and approved=false for all transactions
-- Do NOT set account_id or category_id yet — those come later
+- Leave category_id null; it gets assigned in the categorization step
+- account_id is required before pushing to YNAB; if the caller already
+  knows it, set it here, otherwise leave it null and ask the user which
+  account these transactions belong to before calling create_ynab_transactions
 
 ## Output Format
 Return ONLY a valid JSON array of transaction objects. No extra text.
@@ -469,18 +473,20 @@ categories to a batch of transactions.
 {transactions_json}
 </transactions>
 
-3. For EACH transaction, determine the most appropriate category based on
-   the payee name and memo. Assign the `category_id` field.
+3. For EACH transaction, pick the best-matching category from the list
+   returned by `list_ynab_categories` and assign its `id` to the
+   transaction's `category_id` field.
 
 ## Categorization Guidelines
-- Supermarkets/grocery stores → Groceries
-- Restaurants/cafés → Dining Out
-- Uber/DiDi/transport → Transportation
-- Netflix/Spotify/subscriptions → Subscriptions
-- Pharmacy/health → Healthcare
-- ATM withdrawals → can leave uncategorized
-- Salary/income → Income categories
-- If unsure, leave category_id as null
+- Match against the user's own categories — they may be in any language
+  (e.g. "Mercado", "Restaurantes", "Transporte") so do not translate or
+  invent categories that aren't in the returned list.
+- Use payee_name + memo as primary signals; type of expense (recurring vs
+  one-off) as a secondary signal.
+- ATM withdrawals and unclear payees may be left uncategorized
+  (category_id = null) rather than mis-categorized.
+- If no returned category fits, leave category_id as null and flag the
+  transaction in your summary so the user can categorize it manually.
 
 ## Output Format
 Return the COMPLETE transactions array with category_id populated where
