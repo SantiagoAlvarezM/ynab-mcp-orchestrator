@@ -16,9 +16,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.prompts import base
-from mcp.types import ContentBlock
+from mcp.types import ContentBlock, ToolAnnotations
 from pydantic import Field
 
 from src.config import STATEMENTS_DIR
@@ -62,6 +62,24 @@ mcp = FastMCP(
 # TOOLS
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Annotations: declare each tool's behavior so hosts can gate destructive
+# calls behind explicit user approval without hard-coding tool names.
+_READ_LOCAL = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
+_READ_YNAB = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=True)
+_DESTRUCTIVE_YNAB = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=False,
+    openWorldHint=True,
+)
+_ADDITIVE_YNAB = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=True,
+)
+_PURE = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
+
 
 @mcp.tool(
     name="list_bank_statements",
@@ -69,6 +87,7 @@ mcp = FastMCP(
         "List bank statement files (PDF, Excel, CSV, images) in the "
         "configured statements directory. Optionally filter by subdirectory."
     ),
+    annotations=_READ_LOCAL,
 )
 def tool_list_bank_statements(
     directory: str = Field(
@@ -91,8 +110,10 @@ def tool_list_bank_statements(
         "Supports password-protected PDF and Excel files. "
         "Use the 'extract_transactions' prompt to process the extracted content."
     ),
+    annotations=_READ_LOCAL,
 )
-def tool_read_bank_statement(
+async def tool_read_bank_statement(
+    ctx: Context,
     file_path: str = Field(
         description="Absolute path to the bank statement file.",
     ),
@@ -105,7 +126,10 @@ def tool_read_bank_statement(
         ),
     ),
 ) -> list[ContentBlock]:
-    return read_bank_statement(file_path, password)
+    await ctx.info(f"Reading bank statement: {file_path}")
+    blocks = read_bank_statement(file_path, password)
+    await ctx.info(f"Extracted {len(blocks)} content block(s) from statement")
+    return blocks
 
 
 @mcp.tool(
@@ -115,6 +139,7 @@ def tool_read_bank_statement(
         "Call this BEFORE create_ynab_transactions to catch structural errors and "
         "surface semantic warnings (zero amounts, missing account_id, unusual dates)."
     ),
+    annotations=_PURE,
 )
 def tool_validate_transactions(
     transactions: list[dict[str, Any]] = Field(
@@ -130,6 +155,7 @@ def tool_validate_transactions(
 @mcp.tool(
     name="list_ynab_budgets",
     description="List all YNAB budgets accessible with the configured token.",
+    annotations=_READ_YNAB,
 )
 async def tool_list_ynab_budgets() -> list[dict[str, Any]]:
     return await list_ynab_budgets()
@@ -140,6 +166,7 @@ async def tool_list_ynab_budgets() -> list[dict[str, Any]]:
     description=(
         "List all accounts in a YNAB budget. Returns account ID, name, type, and balance."
     ),
+    annotations=_READ_YNAB,
 )
 async def tool_list_ynab_accounts(
     budget_id: str = Field(description="YNAB budget UUID"),
@@ -153,6 +180,7 @@ async def tool_list_ynab_accounts(
         "List all category groups and categories in a YNAB budget. "
         "Use category_id when categorizing transactions."
     ),
+    annotations=_READ_YNAB,
 )
 async def tool_list_ynab_categories(
     budget_id: str = Field(description="YNAB budget UUID"),
@@ -165,6 +193,7 @@ async def tool_list_ynab_categories(
     description=(
         "List all payees in a YNAB budget. Useful for matching extracted names to existing payees."
     ),
+    annotations=_READ_YNAB,
 )
 async def tool_list_ynab_payees(
     budget_id: str = Field(description="YNAB budget UUID"),
@@ -179,6 +208,7 @@ async def tool_list_ynab_payees(
         "Each transaction MUST include account_id, date, and amount. "
         "Call validate_transactions first to catch errors."
     ),
+    annotations=_ADDITIVE_YNAB,
 )
 async def tool_create_ynab_transactions(
     budget_id: str = Field(description="YNAB budget UUID"),
@@ -195,6 +225,7 @@ async def tool_create_ynab_transactions(
 @mcp.tool(
     name="delete_ynab_transactions",
     description="Delete or rollback transactions in YNAB using their IDs.",
+    annotations=_DESTRUCTIVE_YNAB,
 )
 async def tool_delete_ynab_transactions(
     budget_id: str = Field(description="YNAB budget UUID"),
@@ -225,6 +256,7 @@ YnabAccountType = Literal[
 @mcp.tool(
     name="create_ynab_account",
     description="Create a new account in a YNAB budget.",
+    annotations=_ADDITIVE_YNAB,
 )
 async def tool_create_ynab_account(
     budget_id: str = Field(description="YNAB budget UUID"),
@@ -240,6 +272,7 @@ async def tool_create_ynab_account(
 @mcp.tool(
     name="create_ynab_category",
     description="Create a new category in a YNAB budget.",
+    annotations=_ADDITIVE_YNAB,
 )
 async def tool_create_ynab_category(
     budget_id: str = Field(description="YNAB budget UUID"),
@@ -252,6 +285,7 @@ async def tool_create_ynab_category(
 @mcp.tool(
     name="create_ynab_payee",
     description="Create a new payee in a YNAB budget.",
+    annotations=_ADDITIVE_YNAB,
 )
 async def tool_create_ynab_payee(
     budget_id: str = Field(description="YNAB budget UUID"),
