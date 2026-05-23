@@ -23,7 +23,7 @@ from mcp.types import ContentBlock, ToolAnnotations
 from pydantic import Field
 
 from src.config import STATEMENTS_DIR
-from src.models.transaction import ValidationResult, get_batch_schema, get_transaction_schema
+from src.models.transaction import ValidationResult, get_transaction_schema
 from src.services.ynab_client import ynab_client
 from src.tools.filesystem import list_bank_statements, read_bank_statement
 from src.tools.validation import validate_transactions
@@ -268,7 +268,14 @@ async def tool_create_ynab_account(
     account_type: YnabAccountType = Field(
         description="YNAB account type. Must be one of the allowed values.",
     ),
-    balance: int = Field(default=0, description="Initial balance in milliunits"),
+    balance: int = Field(
+        default=0,
+        description=(
+            "Initial balance in YNAB milliunits (real amount x 1000). "
+            "Negative for liability/credit accounts, positive for assets. "
+            "Examples: 12345000 = $12,345.00 ; -500000 = -$500.00 ; 0 = empty new account."
+        ),
+    ),
 ) -> dict[str, Any]:
     return await create_ynab_account(budget_id, name, account_type, balance)
 
@@ -315,17 +322,6 @@ async def tool_create_ynab_payee(
 )
 def resource_transaction_schema() -> str:
     schema = get_transaction_schema()
-    return json.dumps(schema, indent=2)
-
-
-@mcp.resource(
-    "ynab://schema/batch",
-    name="Transaction Batch Schema",
-    description="JSON Schema for a batch of transactions from a single bank statement.",
-    mime_type="application/json",
-)
-def resource_batch_schema() -> str:
-    schema = get_batch_schema()
     return json.dumps(schema, indent=2)
 
 
@@ -425,7 +421,8 @@ transactions from a bank statement and return them as structured JSON.
    - **payee_name**: The merchant/payee name, cleaned up for readability
    - **memo**: Any additional description or reference numbers
 
-4. Return the result as a JSON object matching this schema:
+4. Return the result as a JSON **array** where each element matches this
+   per-transaction schema:
 
 <transaction_schema>
 {schema}
