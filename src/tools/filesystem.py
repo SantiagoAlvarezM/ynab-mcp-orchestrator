@@ -5,22 +5,12 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
-from pydantic import Field
-
 from src.config import STATEMENTS_DIR, SUPPORTED_EXTENSIONS
 from src.models.transaction import StatementFile
 from src.services.file_reader import read_file
 
 
-def list_bank_statements(
-    directory: str = Field(
-        default="",
-        description=(
-            "Optional subdirectory (e.g. month folder like 'mayo_2026') "
-            "within the statements root. Leave empty to list all files."
-        ),
-    ),
-) -> str:
+def list_bank_statements(directory: str = "") -> str:
     """List bank statement files available for processing.
 
     Scans the configured statements directory for supported file types
@@ -72,22 +62,7 @@ def list_bank_statements(
     )
 
 
-def read_bank_statement(
-    file_path: str = Field(
-        description=(
-            "Absolute path to the bank statement file. "
-            "Supports: .pdf, .xlsx, .xls, .csv, .png, .jpg, .jpeg"
-        ),
-    ),
-    password: str = Field(
-        default="",
-        description=(
-            "Optional password for encrypted/protected PDF or Excel files. "
-            "Colombian banks often use the last 4 digits of your ID (cédula) "
-            "or document number as the password. Leave empty if not protected."
-        ),
-    ),
-) -> str:
+def read_bank_statement(file_path: str, password: str = "") -> str:
     """Read and extract content from a bank statement file.
 
     For text-based files (PDF, Excel, CSV), returns the raw text content.

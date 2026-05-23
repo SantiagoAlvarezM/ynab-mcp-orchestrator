@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-from pydantic import Field
-
 from src.services.ynab_client import ynab_client
 
 
@@ -26,9 +24,7 @@ async def list_ynab_budgets() -> str:
         return json.dumps({"error": str(e)})
 
 
-async def list_ynab_accounts(
-    budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
+async def list_ynab_accounts(budget_id: str) -> str:
     """List all accounts in a YNAB budget."""
     try:
         accounts = await ynab_client.list_accounts(budget_id)
@@ -49,9 +45,7 @@ async def list_ynab_accounts(
         return json.dumps({"error": str(e)})
 
 
-async def list_ynab_categories(
-    budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
+async def list_ynab_categories(budget_id: str) -> str:
     """List all category groups and their categories in a YNAB budget."""
     try:
         groups = await ynab_client.list_categories(budget_id)
@@ -83,9 +77,7 @@ async def list_ynab_categories(
         return json.dumps({"error": str(e)})
 
 
-async def get_ynab_payees(
-    budget_id: str = Field(description="YNAB budget UUID"),
-) -> str:
+async def get_ynab_payees(budget_id: str) -> str:
     """List all payees in a YNAB budget."""
     try:
         payees = await ynab_client.list_payees(budget_id)
@@ -112,9 +104,9 @@ async def create_ynab_account(
 
 
 async def create_ynab_category(
-    budget_id: str = Field(description="YNAB budget UUID"),
-    name: str = Field(description="Name of the new category"),
-    category_group_id: str = Field(description="UUID of the category group to place this in"),
+    budget_id: str,
+    name: str,
+    category_group_id: str,
 ) -> str:
     """Create a new category in a YNAB budget."""
     try:
@@ -124,10 +116,7 @@ async def create_ynab_category(
         return json.dumps({"error": str(e)})
 
 
-async def create_ynab_payee(
-    budget_id: str = Field(description="YNAB budget UUID"),
-    name: str = Field(description="Name of the new payee"),
-) -> str:
+async def create_ynab_payee(budget_id: str, name: str) -> str:
     """Create a new payee in a YNAB budget."""
     try:
         payee = await ynab_client.create_payee(budget_id, name)
@@ -136,12 +125,7 @@ async def create_ynab_payee(
         return json.dumps({"error": str(e)})
 
 
-async def create_ynab_transactions(
-    budget_id: str = Field(description="YNAB budget UUID"),
-    transactions_json: str = Field(
-        description="JSON array of transaction objects to create.",
-    ),
-) -> str:
+async def create_ynab_transactions(budget_id: str, transactions_json: str) -> str:
     """Create transactions in YNAB."""
     try:
         transactions = json.loads(transactions_json)
@@ -181,12 +165,7 @@ async def create_ynab_transactions(
         return json.dumps({"error": str(e)})
 
 
-async def delete_ynab_transactions(
-    budget_id: str = Field(description="YNAB budget UUID"),
-    transaction_ids_json: str = Field(
-        description='JSON array of strings representing the transaction UUIDs to delete. e.g. ["uuid1", "uuid2"]',
-    ),
-) -> str:
+async def delete_ynab_transactions(budget_id: str, transaction_ids_json: str) -> str:
     """Delete (rollback) transactions in YNAB."""
     try:
         transaction_ids = json.loads(transaction_ids_json)
