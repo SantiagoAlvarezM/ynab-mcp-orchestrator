@@ -1,7 +1,6 @@
 """Shared test fixtures for YNAB MCP Orchestrator tests."""
 
 import csv
-import json
 from typing import Any
 
 import openpyxl
@@ -92,9 +91,9 @@ def sample_image(tmp_statements_dir):
 
 
 @pytest.fixture
-def valid_transactions_json():
-    """A valid JSON string of transactions."""
-    transactions = [
+def valid_transactions():
+    """A list of valid transaction dicts."""
+    return [
         {
             "date": "2026-05-15",
             "amount": -150500,
@@ -114,13 +113,12 @@ def valid_transactions_json():
             "account_id": "test-account-uuid",
         },
     ]
-    return json.dumps(transactions)
 
 
 @pytest.fixture
-def invalid_transactions_json():
-    """A JSON string with invalid transactions."""
-    transactions = [
+def invalid_transactions():
+    """A list of transaction dicts with structural errors."""
+    return [
         {
             "date": "2026-05-15",
             # missing 'amount' — required field
@@ -131,4 +129,3 @@ def invalid_transactions_json():
             "amount": "not-a-number",  # wrong type
         },
     ]
-    return json.dumps(transactions)

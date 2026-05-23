@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from src.services.ynab_client import ynab_client
 
@@ -125,14 +126,11 @@ async def create_ynab_payee(budget_id: str, name: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-async def create_ynab_transactions(budget_id: str, transactions_json: str) -> str:
+async def create_ynab_transactions(
+    budget_id: str, transactions: list[dict[str, Any]]
+) -> str:
     """Create transactions in YNAB."""
     try:
-        transactions = json.loads(transactions_json)
-
-        if not isinstance(transactions, list):
-            return json.dumps({"error": "Expected a JSON array of transaction objects."})
-
         if not transactions:
             return json.dumps({"error": "Transaction list is empty."})
 
@@ -159,27 +157,18 @@ async def create_ynab_transactions(budget_id: str, transactions_json: str) -> st
             indent=2,
         )
 
-    except json.JSONDecodeError as e:
-        return json.dumps({"error": f"Invalid JSON: {e}"})
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
-async def delete_ynab_transactions(budget_id: str, transaction_ids_json: str) -> str:
+async def delete_ynab_transactions(budget_id: str, transaction_ids: list[str]) -> str:
     """Delete (rollback) transactions in YNAB."""
     try:
-        transaction_ids = json.loads(transaction_ids_json)
-
-        if not isinstance(transaction_ids, list):
-            return json.dumps({"error": "Expected a JSON array of transaction IDs."})
-
         if not transaction_ids:
             return json.dumps({"error": "Transaction ID list is empty."})
 
         result = await ynab_client.delete_transactions(budget_id, transaction_ids)
         return json.dumps(result, indent=2, ensure_ascii=False)
 
-    except json.JSONDecodeError as e:
-        return json.dumps({"error": f"Invalid JSON: {e}"})
     except Exception as e:
         return json.dumps({"error": str(e)})

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -13,64 +14,24 @@ from src.models.transaction import (
 )
 
 
-def validate_transactions(
-    transactions_json: str,
-) -> str:
-    """Validate a list of extracted transactions against the YNAB schema.
+def validate_transactions(transactions: list[dict[str, Any]]) -> str:
+    """Validate extracted transactions against the YNAB transaction schema.
 
-    Accepts a JSON string representing either:
-    - A TransactionBatch object (with source_file, bank_name, transactions)
-    - A plain JSON array of transaction objects
-
-    Returns a ValidationResult with details about valid/invalid transactions
-    and specific error messages for any that fail validation.
-
-    Use this BEFORE calling create_ynab_transactions to catch errors early.
+    Returns a ValidationResult JSON with detailed errors and warnings.
+    Use this before calling create_ynab_transactions to iterate on errors
+    without invoking the destructive create.
     """
     errors: list[str] = []
     warnings: list[str] = []
     valid_count = 0
+    total = len(transactions)
 
-    try:
-        data = json.loads(transactions_json)
-    except json.JSONDecodeError as e:
-        result = ValidationResult(
-            is_valid=False,
-            total_transactions=0,
-            valid_count=0,
-            error_count=1,
-            errors=[f"Invalid JSON: {e}"],
-        )
-        return json.dumps(result.model_dump(), indent=2)
-
-    # Accept both a batch object and a plain list
-    if isinstance(data, dict) and "transactions" in data:
-        txn_list = data["transactions"]
-    elif isinstance(data, list):
-        txn_list = data
-    else:
-        result = ValidationResult(
-            is_valid=False,
-            total_transactions=0,
-            valid_count=0,
-            error_count=1,
-            errors=[
-                "Expected a JSON array of transactions or an object with a 'transactions' key."
-            ],
-        )
-        return json.dumps(result.model_dump(), indent=2)
-
-    total = len(txn_list)
-
-    for i, txn_data in enumerate(txn_list):
+    for i, txn_data in enumerate(transactions):
         idx = i + 1
         try:
             txn = TransactionCreate.model_validate(txn_data)
             valid_count += 1
-
-            # Additional semantic checks
             _semantic_checks(txn, idx, warnings)
-
         except ValidationError as e:
             for err in e.errors():
                 field = " -> ".join(str(loc) for loc in err["loc"])

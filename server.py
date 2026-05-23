@@ -12,7 +12,7 @@ Usage:
 """
 
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts import base
@@ -95,16 +95,19 @@ def tool_read_bank_statement(
     name="validate_transactions",
     description=(
         "Validate extracted transactions against the YNAB schema. "
-        "Call this BEFORE creating transactions to catch errors early. "
-        "Accepts a JSON string (array or batch object with 'transactions' key)."
+        "Call this BEFORE create_ynab_transactions to catch structural errors and "
+        "surface semantic warnings (zero amounts, missing account_id, unusual dates)."
     ),
 )
 def tool_validate_transactions(
-    transactions_json: str = Field(
-        description="JSON string of transactions to validate.",
+    transactions: list[dict[str, Any]] = Field(
+        description=(
+            "Array of transaction objects to validate. Each object should match "
+            "the schema exposed at resource ynab://schema/transaction."
+        ),
     ),
 ) -> str:
-    return validate_transactions(transactions_json)
+    return validate_transactions(transactions)
 
 
 @mcp.tool(
@@ -155,18 +158,21 @@ async def tool_get_ynab_payees(
 @mcp.tool(
     name="create_ynab_transactions",
     description=(
-        "Push validated transactions to a YNAB budget. "
+        "Push transactions to a YNAB budget. "
         "Each transaction MUST include account_id, date, and amount. "
         "Call validate_transactions first to catch errors."
     ),
 )
 async def tool_create_ynab_transactions(
     budget_id: str = Field(description="YNAB budget UUID"),
-    transactions_json: str = Field(
-        description="JSON array of transaction objects to create.",
+    transactions: list[dict[str, Any]] = Field(
+        description=(
+            "Array of transaction objects to create. See resource "
+            "ynab://schema/transaction for the expected per-item shape."
+        ),
     ),
 ) -> str:
-    return await create_ynab_transactions(budget_id, transactions_json)
+    return await create_ynab_transactions(budget_id, transactions)
 
 
 @mcp.tool(
@@ -175,11 +181,11 @@ async def tool_create_ynab_transactions(
 )
 async def tool_delete_ynab_transactions(
     budget_id: str = Field(description="YNAB budget UUID"),
-    transaction_ids_json: str = Field(
-        description="JSON array of strings representing the transaction UUIDs to delete.",
+    transaction_ids: list[str] = Field(
+        description="Array of YNAB transaction UUIDs to delete.",
     ),
 ) -> str:
-    return await delete_ynab_transactions(budget_id, transaction_ids_json)
+    return await delete_ynab_transactions(budget_id, transaction_ids)
 
 
 YnabAccountType = Literal[
@@ -471,7 +477,7 @@ Rules:
 - Set cleared="uncleared" and approved=false
 
 ## Step 3: Validate
-Call `validate_transactions` with the extracted JSON.
+Call `validate_transactions` with the extracted transactions array.
 If there are errors, fix them and re-validate.
 
 ## Step 4: Categorize
@@ -480,7 +486,7 @@ Assign category_id to each transaction based on the payee/memo.
 
 ## Step 5: Push to YNAB
 Call `create_ynab_transactions` with budget_id="{budget_id}" and the
-final transactions JSON.
+final `transactions` array.
 
 ## Step 6: Report
 Summarize what was done:
