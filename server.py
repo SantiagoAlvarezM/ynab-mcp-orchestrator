@@ -12,6 +12,8 @@ Usage:
 """
 
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
@@ -21,6 +23,7 @@ from pydantic import Field
 
 from src.config import STATEMENTS_DIR
 from src.models.transaction import ValidationResult, get_batch_schema, get_transaction_schema
+from src.services.ynab_client import ynab_client
 from src.tools.filesystem import list_bank_statements, read_bank_statement
 from src.tools.validation import validate_transactions
 from src.tools.ynab import (
@@ -37,9 +40,21 @@ from src.tools.ynab import (
 
 # ── Server Instance ─────────────────────────────────────────────────────────
 
+
+@asynccontextmanager
+async def lifespan(_server: FastMCP) -> AsyncIterator[None]:
+    """Server lifecycle: keep the YNAB HTTP connection pool open for the
+    duration of the session and close it cleanly on shutdown."""
+    try:
+        yield
+    finally:
+        await ynab_client.aclose()
+
+
 mcp = FastMCP(
     "YNAB MCP Orchestrator",
     log_level="ERROR",
+    lifespan=lifespan,
 )
 
 
