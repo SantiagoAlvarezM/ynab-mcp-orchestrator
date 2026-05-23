@@ -12,6 +12,7 @@ Usage:
 """
 
 import json
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, Literal
@@ -53,7 +54,7 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
 mcp = FastMCP(
     "YNAB MCP Orchestrator",
-    log_level="ERROR",
+    log_level=os.getenv("YNAB_MCP_LOG_LEVEL", "ERROR"),
     lifespan=lifespan,
 )
 
@@ -562,8 +563,14 @@ Summarize what was done:
 
 
 def main() -> None:
-    """Console script entry point — runs the MCP server over stdio."""
-    mcp.run(transport="stdio")
+    """Console script entry point.
+
+    Honors two env vars:
+      - YNAB_MCP_TRANSPORT: "stdio" (default), "streamable-http" or "sse"
+      - YNAB_MCP_LOG_LEVEL: overrides the default ERROR log level
+    """
+    transport = os.getenv("YNAB_MCP_TRANSPORT", "stdio")
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":
