@@ -64,19 +64,25 @@ class TestReadBankStatement:
     """Tests for reading bank statement content."""
 
     def test_reads_csv(self, sample_csv):
-        result = json.loads(read_bank_statement(str(sample_csv)))
-        assert result["type"] == "text"
-        assert "EXITO" in result["content"]
+        blocks = read_bank_statement(str(sample_csv))
+        assert len(blocks) == 1
+        assert blocks[0].type == "text"
+        assert "EXITO" in blocks[0].text
+        assert "<statement_data>" in blocks[0].text
 
     def test_reads_excel(self, sample_excel):
-        result = json.loads(read_bank_statement(str(sample_excel)))
-        assert result["type"] == "text"
-        assert "Movimientos" in result["content"]
+        blocks = read_bank_statement(str(sample_excel))
+        assert len(blocks) == 1
+        assert blocks[0].type == "text"
+        assert "Movimientos" in blocks[0].text
 
     def test_reads_image(self, sample_image):
-        result = json.loads(read_bank_statement(str(sample_image)))
-        assert result["type"] == "image"
-        assert "data" in result
+        blocks = read_bank_statement(str(sample_image))
+        assert len(blocks) == 2
+        assert blocks[0].type == "text"
+        assert blocks[1].type == "image"
+        assert blocks[1].data
+        assert blocks[1].mimeType.startswith("image/")
 
     def test_file_not_found_raises(self):
         with pytest.raises(ToolError):

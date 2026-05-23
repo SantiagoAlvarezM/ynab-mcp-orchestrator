@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts import base
+from mcp.types import ContentBlock
 from pydantic import Field
 
 from src.config import STATEMENTS_DIR
@@ -70,7 +71,8 @@ def tool_list_bank_statements(
     name="read_bank_statement",
     description=(
         "Read and extract content from a bank statement file. "
-        "Returns raw text for PDF/Excel/CSV, or base64-encoded image for images. "
+        "Returns a TextContent block for PDF/Excel/CSV, or TextContent + "
+        "ImageContent for images so the host vision model can read them natively. "
         "Supports password-protected PDF and Excel files. "
         "Use the 'extract_transactions' prompt to process the extracted content."
     ),
@@ -87,7 +89,7 @@ def tool_read_bank_statement(
             "Leave empty if the file is not password-protected."
         ),
     ),
-) -> str:
+) -> list[ContentBlock]:
     return read_bank_statement(file_path, password)
 
 

@@ -61,10 +61,9 @@ class TestReadImage:
         assert len(result["data"]) > 0  # base64 data present
         assert result["password_protected"] is False
 
-    def test_image_content_is_descriptive(self, sample_image):
+    def test_image_includes_size(self, sample_image):
         result = read_file(sample_image)
-        assert "Image file" in result["content"]
-        assert "extracto_scan.png" in result["content"]
+        assert result["size_bytes"] > 0
 
 
 class TestReadFileErrors:
