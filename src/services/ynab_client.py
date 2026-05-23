@@ -6,6 +6,7 @@ Reference: https://api.ynab.com/v1
 
 from __future__ import annotations
 
+import asyncio
 import urllib.parse
 from typing import Any
 
@@ -185,19 +186,29 @@ class YNABClient:
             Dict showing success count and failures.
         """
         budget_id = urllib.parse.quote(budget_id, safe="")
-        success_count = 0
-        failures = []
 
-        # YNAB API does not support bulk delete, so we loop
-        for tid in transaction_ids:
+        # YNAB's API has no bulk-delete endpoint, but the per-id calls are
+        # independent — fan them out concurrently so a 200-row rollback is
+        # bounded by latency, not N x latency.
+        async def _delete_one(tid: str) -> tuple[str, Exception | None]:
             try:
                 await self._request(
                     "DELETE",
                     f"/budgets/{budget_id}/transactions/{urllib.parse.quote(tid, safe='')}",
                 )
-                success_count += 1
+                return tid, None
             except Exception as e:
-                failures.append({"id": tid, "error": str(e)})
+                return tid, e
+
+        results = await asyncio.gather(*(_delete_one(tid) for tid in transaction_ids))
+
+        success_count = 0
+        failures: list[dict[str, str]] = []
+        for tid, err in results:
+            if err is None:
+                success_count += 1
+            else:
+                failures.append({"id": tid, "error": str(err)})
 
         return {"success_count": success_count, "failed_count": len(failures), "failures": failures}
 
