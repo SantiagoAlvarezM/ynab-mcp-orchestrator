@@ -5,89 +5,100 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from mcp.server.fastmcp.exceptions import ToolError
+
 from src.services.ynab_client import ynab_client
+
+
+def _wrap_error(operation: str, exc: Exception) -> ToolError:
+    """Convert an upstream exception into a ToolError with operation context."""
+    return ToolError(f"{operation} failed: {exc}")
 
 
 async def list_ynab_budgets() -> str:
     """List all YNAB budgets accessible with the configured Personal Access Token."""
     try:
         budgets = await ynab_client.list_budgets()
-        summary = [
-            {
-                "id": b["id"],
-                "name": b["name"],
-                "last_modified_on": b.get("last_modified_on"),
-            }
-            for b in budgets
-        ]
-        return json.dumps(summary, indent=2, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("list_ynab_budgets", e) from e
+
+    summary = [
+        {
+            "id": b["id"],
+            "name": b["name"],
+            "last_modified_on": b.get("last_modified_on"),
+        }
+        for b in budgets
+    ]
+    return json.dumps(summary, indent=2, ensure_ascii=False)
 
 
 async def list_ynab_accounts(budget_id: str) -> str:
     """List all accounts in a YNAB budget."""
     try:
         accounts = await ynab_client.list_accounts(budget_id)
-        summary = [
-            {
-                "id": a["id"],
-                "name": a["name"],
-                "type": a["type"],
-                "on_budget": a.get("on_budget"),
-                "closed": a.get("closed"),
-                "balance": a.get("balance"),
-            }
-            for a in accounts
-            if not a.get("deleted", False)
-        ]
-        return json.dumps(summary, indent=2, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("list_ynab_accounts", e) from e
+
+    summary = [
+        {
+            "id": a["id"],
+            "name": a["name"],
+            "type": a["type"],
+            "on_budget": a.get("on_budget"),
+            "closed": a.get("closed"),
+            "balance": a.get("balance"),
+        }
+        for a in accounts
+        if not a.get("deleted", False)
+    ]
+    return json.dumps(summary, indent=2, ensure_ascii=False)
 
 
 async def list_ynab_categories(budget_id: str) -> str:
     """List all category groups and their categories in a YNAB budget."""
     try:
         groups = await ynab_client.list_categories(budget_id)
-        summary = []
-        for group in groups:
-            if group.get("deleted", False) or group.get("hidden", False):
-                continue
-            categories = [
-                {
-                    "id": c["id"],
-                    "name": c["name"],
-                    "budgeted": c.get("budgeted"),
-                    "activity": c.get("activity"),
-                    "balance": c.get("balance"),
-                }
-                for c in group.get("categories", [])
-                if not c.get("deleted", False) and not c.get("hidden", False)
-            ]
-            if categories:
-                summary.append(
-                    {
-                        "group_name": group["name"],
-                        "group_id": group["id"],
-                        "categories": categories,
-                    }
-                )
-        return json.dumps(summary, indent=2, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("list_ynab_categories", e) from e
+
+    summary = []
+    for group in groups:
+        if group.get("deleted", False) or group.get("hidden", False):
+            continue
+        categories = [
+            {
+                "id": c["id"],
+                "name": c["name"],
+                "budgeted": c.get("budgeted"),
+                "activity": c.get("activity"),
+                "balance": c.get("balance"),
+            }
+            for c in group.get("categories", [])
+            if not c.get("deleted", False) and not c.get("hidden", False)
+        ]
+        if categories:
+            summary.append(
+                {
+                    "group_name": group["name"],
+                    "group_id": group["id"],
+                    "categories": categories,
+                }
+            )
+    return json.dumps(summary, indent=2, ensure_ascii=False)
 
 
 async def get_ynab_payees(budget_id: str) -> str:
     """List all payees in a YNAB budget."""
     try:
         payees = await ynab_client.list_payees(budget_id)
-        summary = [
-            {"id": p["id"], "name": p["name"]} for p in payees if not p.get("deleted", False)
-        ]
-        return json.dumps(summary, indent=2, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("list_ynab_payees", e) from e
+
+    summary = [
+        {"id": p["id"], "name": p["name"]} for p in payees if not p.get("deleted", False)
+    ]
+    return json.dumps(summary, indent=2, ensure_ascii=False)
 
 
 async def create_ynab_account(
@@ -99,9 +110,9 @@ async def create_ynab_account(
     """Create a new account in a YNAB budget."""
     try:
         account = await ynab_client.create_account(budget_id, name, account_type, balance)
-        return json.dumps(account, indent=2, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("create_ynab_account", e) from e
+    return json.dumps(account, indent=2, ensure_ascii=False)
 
 
 async def create_ynab_category(
@@ -112,63 +123,57 @@ async def create_ynab_category(
     """Create a new category in a YNAB budget."""
     try:
         category = await ynab_client.create_category(budget_id, name, category_group_id)
-        return json.dumps(category, indent=2, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("create_ynab_category", e) from e
+    return json.dumps(category, indent=2, ensure_ascii=False)
 
 
 async def create_ynab_payee(budget_id: str, name: str) -> str:
     """Create a new payee in a YNAB budget."""
     try:
         payee = await ynab_client.create_payee(budget_id, name)
-        return json.dumps(payee, indent=2, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("create_ynab_payee", e) from e
+    return json.dumps(payee, indent=2, ensure_ascii=False)
 
 
 async def create_ynab_transactions(
     budget_id: str, transactions: list[dict[str, Any]]
 ) -> str:
     """Create transactions in YNAB."""
-    try:
-        if not transactions:
-            return json.dumps({"error": "Transaction list is empty."})
+    if not transactions:
+        raise ToolError("Transaction list is empty.")
 
-        missing_account = [i + 1 for i, t in enumerate(transactions) if not t.get("account_id")]
-        if missing_account:
-            return json.dumps(
-                {
-                    "error": (
-                        f"Transactions at positions {missing_account} are missing "
-                        "account_id. All transactions must have an account_id."
-                    ),
-                }
-            )
-
-        result = await ynab_client.create_transactions(budget_id, transactions)
-
-        return json.dumps(
-            {
-                "success": True,
-                "created_count": len(result.get("transaction_ids", [])),
-                "transaction_ids": result.get("transaction_ids", []),
-                "duplicate_import_ids": result.get("duplicate_import_ids", []),
-            },
-            indent=2,
+    missing_account = [i + 1 for i, t in enumerate(transactions) if not t.get("account_id")]
+    if missing_account:
+        raise ToolError(
+            f"Transactions at positions {missing_account} are missing account_id. "
+            "All transactions must have an account_id before being pushed to YNAB."
         )
 
+    try:
+        result = await ynab_client.create_transactions(budget_id, transactions)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("create_ynab_transactions", e) from e
+
+    return json.dumps(
+        {
+            "success": True,
+            "created_count": len(result.get("transaction_ids", [])),
+            "transaction_ids": result.get("transaction_ids", []),
+            "duplicate_import_ids": result.get("duplicate_import_ids", []),
+        },
+        indent=2,
+    )
 
 
 async def delete_ynab_transactions(budget_id: str, transaction_ids: list[str]) -> str:
     """Delete (rollback) transactions in YNAB."""
+    if not transaction_ids:
+        raise ToolError("Transaction ID list is empty.")
+
     try:
-        if not transaction_ids:
-            return json.dumps({"error": "Transaction ID list is empty."})
-
         result = await ynab_client.delete_transactions(budget_id, transaction_ids)
-        return json.dumps(result, indent=2, ensure_ascii=False)
-
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        raise _wrap_error("delete_ynab_transactions", e) from e
+    return json.dumps(result, indent=2, ensure_ascii=False)

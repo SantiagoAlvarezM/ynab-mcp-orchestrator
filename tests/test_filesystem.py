@@ -3,6 +3,9 @@
 import json
 from unittest.mock import patch
 
+import pytest
+from mcp.server.fastmcp.exceptions import ToolError
+
 from src.tools.filesystem import list_bank_statements, read_bank_statement
 
 
@@ -36,9 +39,11 @@ class TestListBankStatements:
             assert result["total_files"] == 1
 
     def test_nonexistent_directory(self, tmp_statements_dir):
-        with patch("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir):
-            result = json.loads(list_bank_statements("does_not_exist"))
-            assert "error" in result
+        with (
+            patch("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir),
+            pytest.raises(ToolError, match="Directory not found"),
+        ):
+            list_bank_statements("does_not_exist")
 
     def test_empty_directory(self, tmp_statements_dir):
         with patch("src.tools.filesystem.STATEMENTS_DIR", tmp_statements_dir):
@@ -73,13 +78,12 @@ class TestReadBankStatement:
         assert result["type"] == "image"
         assert "data" in result
 
-    def test_file_not_found_returns_error(self):
-        result = json.loads(read_bank_statement("/nonexistent/file.pdf"))
-        assert "error" in result
+    def test_file_not_found_raises(self):
+        with pytest.raises(ToolError):
+            read_bank_statement("/nonexistent/file.pdf")
 
-    def test_unsupported_format_returns_error(self, tmp_statements_dir):
+    def test_unsupported_format_raises(self, tmp_statements_dir):
         txt = tmp_statements_dir / "notes.txt"
         txt.write_text("hello")
-        result = json.loads(read_bank_statement(str(txt)))
-        assert "error" in result
-        assert "Unsupported" in result["error"]
+        with pytest.raises(ToolError, match="Unsupported"):
+            read_bank_statement(str(txt))
