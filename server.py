@@ -12,22 +12,31 @@ Usage:
 """
 
 import json
-import os
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from typing import Any, Literal, cast
 
-from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.fastmcp.prompts import base
-from mcp.types import ContentBlock, ToolAnnotations
-from pydantic import Field
+from dotenv import load_dotenv
 
-from src.config import STATEMENTS_DIR
-from src.models.transaction import ValidationResult, get_batch_schema, get_transaction_schema
-from src.services.ynab_client import ynab_client
-from src.tools.filesystem import list_bank_statements, read_bank_statement
-from src.tools.validation import validate_transactions
-from src.tools.ynab import (
+load_dotenv()
+
+import os  # noqa: E402
+from collections.abc import AsyncIterator  # noqa: E402
+from contextlib import asynccontextmanager  # noqa: E402
+from typing import Any, Literal, cast  # noqa: E402
+
+from mcp.server.fastmcp import Context, FastMCP  # noqa: E402
+from mcp.server.fastmcp.prompts import base  # noqa: E402
+from mcp.types import ContentBlock, ToolAnnotations  # noqa: E402
+from pydantic import Field  # noqa: E402
+
+from src.config import STATEMENTS_DIR  # noqa: E402
+from src.models.transaction import (  # noqa: E402
+    ValidationResult,
+    get_batch_schema,
+    get_transaction_schema,
+)
+from src.services.ynab_client import ynab_client  # noqa: E402
+from src.tools.filesystem import list_bank_statements, read_bank_statement  # noqa: E402
+from src.tools.validation import validate_transactions  # noqa: E402
+from src.tools.ynab import (  # noqa: E402
     create_ynab_account,
     create_ynab_category,
     create_ynab_payee,
