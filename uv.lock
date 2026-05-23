@@ -1586,7 +1586,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.102.0" },
     { name = "google-genai", specifier = ">=2.3.0" },
     { name = "httpx", specifier = ">=0.28.0" },
-    { name = "mcp", extras = ["cli"], specifier = ">=1.8.0" },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.18.0" },
     { name = "msoffcrypto-tool", specifier = ">=5.4.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pydantic", specifier = ">=2.0" },

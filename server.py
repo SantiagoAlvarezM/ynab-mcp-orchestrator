@@ -12,6 +12,7 @@ Usage:
 """
 
 import json
+from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts import base
@@ -181,6 +182,23 @@ async def tool_delete_ynab_transactions(
     return await delete_ynab_transactions(budget_id, transaction_ids_json)
 
 
+YnabAccountType = Literal[
+    "checking",
+    "savings",
+    "cash",
+    "creditCard",
+    "lineOfCredit",
+    "otherAsset",
+    "otherLiability",
+    "mortgage",
+    "autoLoan",
+    "studentLoan",
+    "personalLoan",
+    "medicalDebt",
+    "otherDebt",
+]
+
+
 @mcp.tool(
     name="create_ynab_account",
     description="Create a new account in a YNAB budget.",
@@ -188,10 +206,12 @@ async def tool_delete_ynab_transactions(
 async def tool_create_ynab_account(
     budget_id: str = Field(description="YNAB budget UUID"),
     name: str = Field(description="Name of the new account"),
-    type: str = Field(description="Type of account (e.g. 'checking', 'savings', 'creditCard')"),
+    account_type: YnabAccountType = Field(
+        description="YNAB account type. Must be one of the allowed values.",
+    ),
     balance: int = Field(default=0, description="Initial balance in milliunits"),
 ) -> str:
-    return await create_ynab_account(budget_id, name, type, balance)
+    return await create_ynab_account(budget_id, name, account_type, balance)
 
 
 @mcp.tool(
@@ -477,5 +497,11 @@ Summarize what was done:
 # ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════
 
-if __name__ == "__main__":
+
+def main() -> None:
+    """Console script entry point — runs the MCP server over stdio."""
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

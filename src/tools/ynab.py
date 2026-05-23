@@ -98,14 +98,14 @@ async def get_ynab_payees(
 
 
 async def create_ynab_account(
-    budget_id: str = Field(description="YNAB budget UUID"),
-    name: str = Field(description="Name of the new account"),
-    type: str = Field(description="Type of account (e.g. 'checking', 'savings', 'creditCard')"),
-    balance: int = Field(default=0, description="Initial balance in milliunits"),
+    budget_id: str,
+    name: str,
+    account_type: str,
+    balance: int = 0,
 ) -> str:
     """Create a new account in a YNAB budget."""
     try:
-        account = await ynab_client.create_account(budget_id, name, type, balance)
+        account = await ynab_client.create_account(budget_id, name, account_type, balance)
         return json.dumps(account, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})

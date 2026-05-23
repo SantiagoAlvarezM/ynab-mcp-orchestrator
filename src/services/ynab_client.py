@@ -94,10 +94,12 @@ class YNABClient:
         data = await self._request("GET", f"/budgets/{budget_id}/accounts")
         return data.get("data", {}).get("accounts", [])
 
-    async def create_account(self, budget_id: str, name: str, type: str, balance: int = 0) -> dict:
+    async def create_account(
+        self, budget_id: str, name: str, account_type: str, balance: int = 0
+    ) -> dict:
         """Create a new account in a budget."""
         budget_id = urllib.parse.quote(budget_id, safe="")
-        body = {"account": {"name": name, "type": type, "balance": balance}}
+        body = {"account": {"name": name, "type": account_type, "balance": balance}}
         data = await self._request("POST", f"/budgets/{budget_id}/accounts", json_body=body)
         return data.get("data", {}).get("account", {})
 

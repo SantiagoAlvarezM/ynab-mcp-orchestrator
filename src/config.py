@@ -9,7 +9,9 @@ load_dotenv()
 
 # ── Filesystem ──────────────────────────────────────────────────────────────
 
-STATEMENTS_DIR = Path(os.getenv("STATEMENTS_DIR", os.path.expanduser("~/Personal/extractos")))
+STATEMENTS_DIR = Path(
+    os.getenv("STATEMENTS_DIR", os.path.expanduser("~/Personal/extractos"))
+).resolve()
 
 # Supported file extensions for bank statements
 SUPPORTED_EXTENSIONS: set[str] = {
