@@ -56,7 +56,7 @@ def list_bank_statements(directory: str = "") -> dict[str, Any]:
     }
 
 
-def read_bank_statement(file_path: str, password: str = "") -> list[ContentBlock]:
+def read_bank_statement(file_path: str, password: str = "") -> list[ContentBlock]:  # nosec B107
     """Read and extract content from a bank statement file.
 
     For text-based files (PDF, Excel, CSV), returns a single TextContent block

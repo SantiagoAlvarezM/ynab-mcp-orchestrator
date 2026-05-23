@@ -15,7 +15,7 @@ import json
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.prompts import base
@@ -52,9 +52,12 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[None]:
         await ynab_client.aclose()
 
 
+_LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+_Transport = Literal["stdio", "sse", "streamable-http"]
+
 mcp = FastMCP(
     "YNAB MCP Orchestrator",
-    log_level=os.getenv("YNAB_MCP_LOG_LEVEL", "ERROR"),
+    log_level=cast(_LogLevel, os.getenv("YNAB_MCP_LOG_LEVEL", "ERROR")),
     lifespan=lifespan,
 )
 
@@ -569,7 +572,7 @@ def main() -> None:
       - YNAB_MCP_TRANSPORT: "stdio" (default), "streamable-http" or "sse"
       - YNAB_MCP_LOG_LEVEL: overrides the default ERROR log level
     """
-    transport = os.getenv("YNAB_MCP_TRANSPORT", "stdio")
+    transport = cast(_Transport, os.getenv("YNAB_MCP_TRANSPORT", "stdio"))
     mcp.run(transport=transport)
 
 

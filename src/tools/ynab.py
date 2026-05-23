@@ -92,9 +92,7 @@ async def list_ynab_payees(budget_id: str) -> list[dict[str, Any]]:
     except Exception as e:
         raise _wrap_error("list_ynab_payees", e) from e
 
-    return [
-        {"id": p["id"], "name": p["name"]} for p in payees if not p.get("deleted", False)
-    ]
+    return [{"id": p["id"], "name": p["name"]} for p in payees if not p.get("deleted", False)]
 
 
 async def create_ynab_account(
@@ -157,9 +155,7 @@ async def create_ynab_transactions(
     }
 
 
-async def delete_ynab_transactions(
-    budget_id: str, transaction_ids: list[str]
-) -> dict[str, Any]:
+async def delete_ynab_transactions(budget_id: str, transaction_ids: list[str]) -> dict[str, Any]:
     """Delete (rollback) transactions in YNAB."""
     if not transaction_ids:
         raise ToolError("Transaction ID list is empty.")
