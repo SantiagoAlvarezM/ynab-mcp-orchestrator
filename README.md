@@ -68,6 +68,13 @@ cp .env.example .env
 # Edit .env with your YNAB_PAT and STATEMENTS_DIR
 ```
 
+**Optional server settings** (override in `.env` if needed):
+
+| Variable | Default | Description |
+|---|---|---|
+| `YNAB_MCP_TRANSPORT` | `stdio` | Transport for `server.py`. One of `stdio`, `streamable-http`, `sse`. |
+| `YNAB_MCP_LOG_LEVEL` | `ERROR` | FastMCP log level. One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
+
 ### 2. Install dependencies
 
 ```bash
@@ -153,10 +160,13 @@ uv run server.py
 
 This orchestrator is designed with strict security boundaries:
 - **Path Traversal Protection:** Bank statement reads and directory listings are strictly locked to your configured `STATEMENTS_DIR`.
+- **MCP Tool Annotations:** Every tool declares `readOnly` / `destructive` / `idempotent` hints, so MCP hosts can gate dangerous calls behind explicit user approval without hard-coding tool names.
 - **Human-in-the-Loop:** The interactive host pauses and requires explicit terminal approval before executing any state-mutating actions (like creating or deleting YNAB transactions, accounts, payees, or categories).
 - **Prompt Injection Defense:** External statement data is wrapped in strict XML delimiters to prevent malicious payloads from hijacking the LLM's instructions.
 - **API Safety:** YNAB API identifiers are fully sanitized and URL-encoded.
 - **Credential Redaction:** Sensitive tool parameters (like bank statement passwords) are actively redacted from the interactive console logs to prevent local leakage.
+
+For the full threat model and how to report vulnerabilities, see [SECURITY.md](./SECURITY.md).
 
 ## 📜 License
 
