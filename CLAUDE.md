@@ -64,6 +64,18 @@ When adding or modifying tools in `src/tools/`:
 - `src/models/` — Pydantic schemas
 - `src/hosts/` — LLM drivers for `host.py` (add new providers here following `claude.py`/`gemini.py`)
 
+## CI & Automation
+
+**Local:** Use the `/run-ci` skill to run the full pipeline before opening a PR. It mirrors `ci.yml` exactly: lint → format check → pyright → bandit → tests.
+
+**On every PR (GitHub Actions):**
+- `ci.yml` — lint, format check, pyright, bandit, tests (lint must pass before tests run)
+- `claude-code-review.yml` — automatic `/code-review` by Claude Code
+- `jules-review.yml` — automatic AI review by Jules (Google)
+- `claude.yml` — mention `@claude` in any issue or PR comment to trigger Claude Code
+
+**Format-on-edit hook:** `.claude/settings.json` runs `ruff format` on every `.py` file after a Write or Edit — no need to format manually during editing.
+
 ## Git Workflow
 
 - Feature branches + PRs only — no direct commits to `main`
