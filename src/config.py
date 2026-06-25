@@ -13,6 +13,10 @@ STATEMENTS_DIR = Path(
     os.getenv("STATEMENTS_DIR", os.path.expanduser("~/Personal/extractos"))
 ).resolve()
 
+CLEANUP_RULES_PATH = Path(
+    os.getenv("YNAB_CLEANUP_RULES_PATH", os.path.expanduser("~/Personal/payee_mapping.json"))
+).resolve()
+
 # Supported file extensions for bank statements
 SUPPORTED_EXTENSIONS: set[str] = {
     ".pdf",
