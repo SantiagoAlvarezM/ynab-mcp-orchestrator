@@ -22,7 +22,7 @@ from mcp.server.fastmcp.prompts import base
 from mcp.types import ContentBlock, ToolAnnotations
 from pydantic import Field
 
-from src.config import STATEMENTS_DIR
+from src.config import CLEANUP_RULES_PATH, STATEMENTS_DIR
 from src.models.transaction import ValidationResult, get_transaction_schema
 from src.services.ynab_client import ynab_client
 from src.tools.filesystem import list_bank_statements, read_bank_statement
@@ -33,10 +33,13 @@ from src.tools.ynab import (
     create_ynab_payee,
     create_ynab_transactions,
     delete_ynab_transactions,
+    find_internal_transfer_candidates,
     list_ynab_accounts,
     list_ynab_budgets,
     list_ynab_categories,
     list_ynab_payees,
+    list_ynab_transactions,
+    update_ynab_transactions,
 )
 
 # ── Server Instance ─────────────────────────────────────────────────────────
@@ -77,6 +80,12 @@ _DESTRUCTIVE_YNAB = ToolAnnotations(
     openWorldHint=True,
 )
 _ADDITIVE_YNAB = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=True,
+)
+_MODIFY_YNAB = ToolAnnotations(
     readOnlyHint=False,
     destructiveHint=False,
     idempotentHint=False,
@@ -206,6 +215,87 @@ async def tool_list_ynab_payees(
 
 
 @mcp.tool(
+    name="list_ynab_transactions",
+    description=(
+        "List existing YNAB transactions for review, cleanup, and matching workflows. "
+        "Returns normalized fields including transfer link IDs and import payee names."
+    ),
+    annotations=_READ_YNAB,
+)
+async def tool_list_ynab_transactions(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    since_date: str = Field(
+        default="",
+        description="Optional ISO date (YYYY-MM-DD). Only transactions on/after this date.",
+    ),
+    account_id: str = Field(
+        default="",
+        description="Optional YNAB account UUID to filter transactions.",
+    ),
+    include_deleted: bool = Field(
+        default=False,
+        description="Include transactions marked deleted by YNAB.",
+    ),
+) -> list[dict[str, Any]]:
+    return await list_ynab_transactions(
+        budget_id,
+        since_date or None,
+        account_id or None,
+        include_deleted,
+    )
+
+
+@mcp.tool(
+    name="update_ynab_transactions",
+    description=(
+        "Update existing YNAB transactions by ID. Supports only explicit cleanup fields: "
+        "payee_id, payee_name, category_id, memo, approved, and cleared. "
+        "Use list_ynab_transactions first, then update only reviewed transactions. "
+        "Changing a payee to a YNAB transfer payee may create a counterpart row; "
+        "prefer find_internal_transfer_candidates before transfer cleanup."
+    ),
+    annotations=_MODIFY_YNAB,
+)
+async def tool_update_ynab_transactions(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    updates: list[dict[str, Any]] = Field(
+        description=(
+            "Array of update objects. Each object must include id and may include "
+            "payee_id, payee_name, category_id, memo, approved, or cleared."
+        ),
+    ),
+) -> dict[str, Any]:
+    return await update_ynab_transactions(budget_id, updates)
+
+
+@mcp.tool(
+    name="find_internal_transfer_candidates",
+    description=(
+        "Find same-date, same-amount, opposite-sign transaction pairs that may be "
+        "internal transfers. Reports already-linked pairs, unlinked exact pairs, "
+        "and ambiguous same-day groups."
+    ),
+    annotations=_READ_YNAB,
+)
+async def tool_find_internal_transfer_candidates(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    since_date: str = Field(
+        default="",
+        description="Optional ISO date (YYYY-MM-DD). Only transactions on/after this date.",
+    ),
+    account_ids: list[str] = Field(
+        default_factory=list,
+        description="Optional list of YNAB account UUIDs to consider as internal accounts.",
+    ),
+) -> dict[str, Any]:
+    return await find_internal_transfer_candidates(
+        budget_id,
+        since_date or None,
+        account_ids or None,
+    )
+
+
+@mcp.tool(
     name="create_ynab_transactions",
     description=(
         "Push transactions to a YNAB budget. "
@@ -323,6 +413,43 @@ async def tool_create_ynab_payee(
 def resource_transaction_schema() -> str:
     schema = get_transaction_schema()
     return json.dumps(schema, indent=2)
+
+
+@mcp.resource(
+    "ynab://cleanup/rules",
+    name="Cleanup Rules",
+    description=(
+        "Optional local JSON rules for mapping bank memo/payee patterns to "
+        "clean YNAB payee names and category IDs."
+    ),
+    mime_type="application/json",
+)
+def resource_cleanup_rules() -> str:
+    if not CLEANUP_RULES_PATH.exists():
+        return json.dumps(
+            {
+                "configured_path": str(CLEANUP_RULES_PATH),
+                "exists": False,
+                "rules": {},
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+
+    try:
+        rules = json.loads(CLEANUP_RULES_PATH.read_text())
+    except json.JSONDecodeError as exc:
+        rules = {"error": f"Invalid JSON: {exc}"}
+
+    return json.dumps(
+        {
+            "configured_path": str(CLEANUP_RULES_PATH),
+            "exists": True,
+            "rules": rules,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 @mcp.resource(
@@ -492,6 +619,58 @@ categories to a batch of transactions.
 ## Output Format
 Return the COMPLETE transactions array with category_id populated where
 applicable. Return ONLY valid JSON, no extra text.
+"""
+
+    return [base.UserMessage(prompt)]
+
+
+@mcp.prompt(
+    name="audit_uncategorized_transactions",
+    description=(
+        "Review existing YNAB transactions with missing payees or categories, "
+        "excluding proper linked transfers, and propose safe cleanup updates."
+    ),
+)
+def prompt_audit_uncategorized_transactions(
+    budget_id: str = Field(description="YNAB budget UUID"),
+    since_date: str = Field(
+        default="",
+        description="Optional ISO date (YYYY-MM-DD) to limit the audit window",
+    ),
+) -> list[base.Message]:
+    prompt = f"""\
+You are a careful YNAB cleanup assistant. Your task is to audit existing
+transactions for missing payees and categories without misclassifying ambiguous
+spending.
+
+## Instructions
+
+1. Call `list_ynab_transactions` with budget_id="{budget_id}" and
+   since_date="{since_date}" if a date was provided.
+
+2. Treat transactions with `transfer_transaction_id` as proper transfers. If
+   their category is null or displayed as Uncategorized, do NOT count that as a
+   cleanup problem.
+
+3. Read `ynab://cleanup/rules` if available, then group remaining problem
+   transactions by memo/payee pattern.
+
+4. Propose only high-confidence updates. Prefer filling payee names when the
+   memo clearly identifies a merchant, bank fee, interest, or ATM withdrawal.
+   Leave generic patterns such as "Compra A Comercio Llave",
+   "Transferencia A Llave", "Compra 000000", and vague transfers for manual
+   review unless the surrounding data makes the answer obvious.
+
+5. Before calling `update_ynab_transactions`, summarize the proposed updates
+   and ask the user for approval.
+
+## Output
+
+Return a concise audit summary with:
+- linked transfer false alarms ignored
+- real missing payee/category counts
+- proposed high-confidence updates
+- ambiguous groups left untouched
 """
 
     return [base.UserMessage(prompt)]

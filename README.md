@@ -29,6 +29,9 @@ The server exposes tools, resources, and prompts that allow **any MCP-compatible
 │   • list_ynab_accounts       │
 │   • list_ynab_categories     │
 │   • list_ynab_payees         │
+│   • list_ynab_transactions   │
+│   • update_ynab_transactions │
+│   • find_internal_transfer_candidates  │
 │   • create_ynab_account      │
 │   • create_ynab_category     │
 │   • create_ynab_payee        │
@@ -38,11 +41,13 @@ The server exposes tools, resources, and prompts that allow **any MCP-compatible
 │   • Transaction Schema       │
 │   • Batch Schema             │
 │   • Supported Banks          │
+│   • Cleanup Rules            │
 │                              │
 │   Prompts:                   │
 │   • extract_transactions     │
 │   • categorize_transactions  │
 │   • process_statement        │
+│   • audit_uncategorized_txns │
 └──────┬──────────┬────────────┘
        │          │
   Local FS    YNAB API
@@ -74,6 +79,7 @@ cp .env.example .env
 |---|---|---|
 | `YNAB_MCP_TRANSPORT` | `stdio` | Transport for `server.py`. One of `stdio`, `streamable-http`, `sse`. |
 | `YNAB_MCP_LOG_LEVEL` | `ERROR` | FastMCP log level. One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
+| `YNAB_CLEANUP_RULES_PATH` | `~/Personal/payee_mapping.json` | Optional JSON mapping used by the cleanup-rules resource and audit prompt. |
 
 ### 2. Install dependencies
 
@@ -145,6 +151,16 @@ Add to your Claude Desktop MCP config (`~/.config/claude/claude_desktop_config.j
 4. **"Categorize and push to YNAB"** → uses `categorize_transactions` prompt + `create_ynab_transactions`
 
 Or use the **`process_statement`** prompt for the full end-to-end workflow in one shot.
+
+## 🧹 Cleanup Workflow
+
+For existing YNAB cleanup work, the server also exposes:
+
+- `list_ynab_transactions` to inspect current transactions with payee, category, import, and transfer-link metadata.
+- `update_ynab_transactions` to apply explicit payee/category/memo/approval/cleared updates by transaction ID.
+- `find_internal_transfer_candidates` to locate same-date, same-amount, opposite-sign pairs and separate already-linked transfers from ambiguous candidates.
+- `ynab://cleanup/rules` for optional local mapping rules.
+- `audit_uncategorized_transactions` to guide a review of missing payees/categories while ignoring normal linked-transfer category nulls.
 
 ## 🛠 Development
 

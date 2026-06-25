@@ -150,6 +150,101 @@ class YNABClient:
 
     # ── Transactions ────────────────────────────────────────────────────────
 
+    async def list_transactions(
+        self,
+        budget_id: str,
+        since_date: str | None = None,
+        account_id: str | None = None,
+    ) -> list[dict]:
+        """List transactions in a budget, optionally filtered by date and account."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
+        query: dict[str, str] = {}
+        if since_date:
+            query["since_date"] = since_date
+        path = f"/budgets/{budget_id}/transactions"
+        if query:
+            path = f"{path}?{urllib.parse.urlencode(query)}"
+        data = await self._request("GET", path)
+        transactions = data.get("data", {}).get("transactions", [])
+        if account_id:
+            transactions = [t for t in transactions if t.get("account_id") == account_id]
+        return transactions
+
+    async def get_transaction(self, budget_id: str, transaction_id: str) -> dict:
+        """Fetch one transaction by ID."""
+        budget_id = urllib.parse.quote(budget_id, safe="")
+        transaction_id = urllib.parse.quote(transaction_id, safe="")
+        data = await self._request("GET", f"/budgets/{budget_id}/transactions/{transaction_id}")
+        return data.get("data", {}).get("transaction", {})
+
+    async def update_transactions(
+        self,
+        budget_id: str,
+        updates: list[dict],
+    ) -> dict:
+        """Update existing transactions by merging allowed fields onto current state."""
+        budget_id_quoted = urllib.parse.quote(budget_id, safe="")
+        allowed_fields = {"payee_id", "payee_name", "category_id", "memo", "approved", "cleared"}
+
+        async def _update_one(update: dict) -> tuple[dict | None, Exception | None]:
+            try:
+                transaction_id = update["id"]
+                unknown = sorted(set(update) - ({"id"} | allowed_fields))
+                if unknown:
+                    raise ValueError(f"Unsupported update fields for {transaction_id}: {unknown}")
+
+                current = await self.get_transaction(budget_id, transaction_id)
+                if not current:
+                    raise ValueError(f"Transaction not found: {transaction_id}")
+
+                transaction = {
+                    "account_id": current["account_id"],
+                    "date": current["date"],
+                    "amount": current["amount"],
+                    "cleared": update.get("cleared", current.get("cleared", "uncleared")),
+                    "approved": update.get("approved", current.get("approved", False)),
+                    "memo": update.get("memo", current.get("memo")),
+                }
+
+                if "payee_id" in update:
+                    transaction["payee_id"] = update["payee_id"]
+                elif "payee_name" in update:
+                    transaction["payee_name"] = update["payee_name"]
+                elif current.get("payee_id"):
+                    transaction["payee_id"] = current["payee_id"]
+                elif current.get("payee_name"):
+                    transaction["payee_name"] = current["payee_name"]
+
+                if "category_id" in update:
+                    transaction["category_id"] = update["category_id"]
+                else:
+                    transaction["category_id"] = current.get("category_id")
+
+                data = await self._request(
+                    "PUT",
+                    f"/budgets/{budget_id_quoted}/transactions/{urllib.parse.quote(transaction_id, safe='')}",
+                    json_body={"transaction": transaction},
+                )
+                return data.get("data", {}).get("transaction", {}), None
+            except Exception as e:
+                return None, e
+
+        results = await asyncio.gather(*(_update_one(update) for update in updates))
+        transactions: list[dict] = []
+        failures: list[dict[str, str]] = []
+        for update, (transaction, err) in zip(updates, results, strict=False):
+            if err is None and transaction is not None:
+                transactions.append(transaction)
+            else:
+                failures.append({"id": str(update.get("id", "")), "error": str(err)})
+
+        return {
+            "updated_count": len(transactions),
+            "failed_count": len(failures),
+            "transactions": transactions,
+            "failures": failures,
+        }
+
     async def create_transactions(
         self,
         budget_id: str,

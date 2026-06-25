@@ -113,3 +113,93 @@ class TestYNABClientTransactions:
             result = await client.create_transactions("budget-1", transactions)
             assert len(result["transaction_ids"]) == 2
             assert result["duplicate_import_ids"] == []
+
+    async def test_list_transactions_with_since_date(self, client):
+        mock_response = {
+            "data": {
+                "transactions": [
+                    {"id": "txn-1", "account_id": "acc-1", "date": "2026-05-15"},
+                    {"id": "txn-2", "account_id": "acc-2", "date": "2026-05-16"},
+                ]
+            }
+        }
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value=mock_response
+        ) as req:
+            result = await client.list_transactions("budget-1", since_date="2026-05-01")
+            req.assert_awaited_once_with(
+                "GET", "/budgets/budget-1/transactions?since_date=2026-05-01"
+            )
+            assert len(result) == 2
+
+    async def test_list_transactions_filters_account_id(self, client):
+        mock_response = {
+            "data": {
+                "transactions": [
+                    {"id": "txn-1", "account_id": "acc-1"},
+                    {"id": "txn-2", "account_id": "acc-2"},
+                ]
+            }
+        }
+        with patch.object(client, "_request", new_callable=AsyncMock, return_value=mock_response):
+            result = await client.list_transactions("budget-1", account_id="acc-2")
+            assert [t["id"] for t in result] == ["txn-2"]
+
+    async def test_update_transactions_merges_allowed_fields(self, client):
+        current = {
+            "data": {
+                "transaction": {
+                    "id": "txn-1",
+                    "account_id": "acc-1",
+                    "date": "2026-05-15",
+                    "amount": -150500,
+                    "cleared": "cleared",
+                    "approved": False,
+                    "memo": "old memo",
+                    "payee_name": "Old Payee",
+                    "category_id": "cat-old",
+                }
+            }
+        }
+        updated = {
+            "data": {
+                "transaction": {
+                    "id": "txn-1",
+                    "account_id": "acc-1",
+                    "date": "2026-05-15",
+                    "amount": -150500,
+                    "payee_name": "New Payee",
+                    "category_id": "cat-old",
+                }
+            }
+        }
+        request = AsyncMock(side_effect=[current, updated])
+        with patch.object(client, "_request", request):
+            result = await client.update_transactions(
+                "budget-1", [{"id": "txn-1", "payee_name": "New Payee"}]
+            )
+
+        assert result["updated_count"] == 1
+        request.assert_any_await("GET", "/budgets/budget-1/transactions/txn-1")
+        request.assert_any_await(
+            "PUT",
+            "/budgets/budget-1/transactions/txn-1",
+            json_body={
+                "transaction": {
+                    "account_id": "acc-1",
+                    "date": "2026-05-15",
+                    "amount": -150500,
+                    "cleared": "cleared",
+                    "approved": False,
+                    "memo": "old memo",
+                    "payee_name": "New Payee",
+                    "category_id": "cat-old",
+                }
+            },
+        )
+
+    async def test_update_transactions_rejects_unknown_fields(self, client):
+        result = await client.update_transactions("budget-1", [{"id": "txn-1", "amount": 123}])
+        assert result["updated_count"] == 0
+        assert result["failed_count"] == 1
+        assert "Unsupported update fields" in result["failures"][0]["error"]
